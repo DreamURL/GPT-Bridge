@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { registerCommands } from './commands';
 import { onConfigChange, readConfig } from './config';
+import { BridgeServer } from './mcp/McpServer';
 import { SecretStore } from './secrets';
 import { BridgeStateStore } from './state';
 import { BridgeViewProvider } from './ui/BridgeViewProvider';
@@ -31,8 +32,20 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  const server = new BridgeServer({
+    log,
+    store,
+    secrets,
+    extensionPath: context.extensionUri.fsPath,
+    onActivity: (entry) => {
+      const mark = entry.blocked === true ? '차단' : entry.ok ? 'ok' : '실패';
+      log.info(`[${mark}] ${entry.tool} ${entry.detail} (${entry.durationMs}ms)`);
+    }
+  });
+  context.subscriptions.push(server);
+
   statusBar.update(store.current);
-  registerCommands(context, { log, store, secrets });
+  registerCommands(context, { log, store, secrets, server });
 
   context.subscriptions.push(
     onConfigChange((config) => {
@@ -53,12 +66,13 @@ export function activate(context: vscode.ExtensionContext): void {
     log.info(`워크스페이스: ${folder.name}`);
   }
 
-  if (config.autoStart) {
-    log.info('autoStart가 켜져 있지만 서버 시작은 Phase 2에서 구현됩니다.');
+  if (config.autoStart && folder !== undefined) {
+    log.info('autoStart가 켜져 있어 서버를 시작합니다.');
+    void server.start();
   }
 }
 
 export function deactivate(): void {
-  // Phase 1에는 정리할 외부 리소스가 없다. context.subscriptions가 전부 처리한다.
+  // 서버는 context.subscriptions에 등록된 BridgeServer.dispose()가 닫는다.
   // Phase 3에서 cloudflared 프로세스 종료(SIGTERM → 5초 → SIGKILL)를 여기에 붙인다.
 }

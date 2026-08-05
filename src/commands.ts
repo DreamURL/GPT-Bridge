@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import { CHATGPT_INSTRUCTIONS, CONNECTOR_SETUP_PATH } from './instructions';
+import type { BridgeServer } from './mcp/McpServer';
+import { MCP_ENDPOINT } from './mcp/http';
 import { maskToken, type SecretStore } from './secrets';
 import type { BridgeStateStore } from './state';
 
@@ -7,15 +9,11 @@ export interface CommandDeps {
   readonly log: vscode.LogOutputChannel;
   readonly store: BridgeStateStore;
   readonly secrets: SecretStore;
+  readonly server: BridgeServer;
 }
 
-/** Phase 2/3에서 실제 구현이 붙기 전까지 쓰는 안내. */
-const NOT_YET = (phase: string, what: string): void => {
-  void vscode.window.showInformationMessage(`${what}은(는) ${phase}에서 구현됩니다.`);
-};
-
 export function registerCommands(context: vscode.ExtensionContext, deps: CommandDeps): void {
-  const { log, store, secrets } = deps;
+  const { log, store, secrets, server } = deps;
 
   const register = (id: string, handler: () => void | Promise<void>): void => {
     context.subscriptions.push(
@@ -31,29 +29,35 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
   };
 
   // ── 서버 생명주기 ───────────────────────────────────────────────
-  // Phase 1은 스텁이다. 상태를 'running'으로 바꾸지 않는다. 서버가 뜨지 않았는데
-  // 실행 중으로 표시하면 상태바가 거짓말을 하게 되고, 이 확장에서 상태 표시가
-  // 어긋나는 것은 그 자체로 보안 문제다.
-  register('gptBridge.start', () => {
-    log.info('서버 시작 요청 — Phase 2 미구현 스텁');
-    NOT_YET('Phase 2', 'MCP 서버 시작');
+  register('gptBridge.start', async () => {
+    await server.start();
   });
 
-  register('gptBridge.stop', () => {
-    log.info('서버 중지 요청 — 실행 중인 서버가 없습니다');
-    NOT_YET('Phase 2', 'MCP 서버 중지');
+  register('gptBridge.stop', async () => {
+    if (!server.isRunning) {
+      void vscode.window.showInformationMessage('GPT Bridge: 실행 중인 서버가 없습니다.');
+      return;
+    }
+    await server.stop();
+    void vscode.window.showInformationMessage('GPT Bridge: 서버를 중지했습니다.');
   });
 
   register('gptBridge.copyUrl', async () => {
-    const { tunnelUrl } = store.current;
-    if (tunnelUrl === undefined) {
+    const { tunnelUrl, port } = store.current;
+
+    // 터널은 Phase 3에서 붙는다. 그전까지는 로컬 주소를 준다 —
+    // MCP Inspector로 확인할 때 필요하다.
+    const url = tunnelUrl ?? (port === undefined ? undefined : `http://127.0.0.1:${port}${MCP_ENDPOINT}`);
+    if (url === undefined) {
       void vscode.window.showWarningMessage(
-        'GPT Bridge: 아직 커넥터 URL이 없습니다. 터널은 Phase 3에서 구현됩니다.'
+        'GPT Bridge: 서버가 실행 중이 아닙니다. 먼저 "서버 시작"을 실행하세요.'
       );
       return;
     }
-    await vscode.env.clipboard.writeText(tunnelUrl);
-    void vscode.window.showInformationMessage('GPT Bridge: 커넥터 URL을 복사했습니다.');
+
+    await vscode.env.clipboard.writeText(url);
+    const kind = tunnelUrl === undefined ? '로컬 엔드포인트' : '커넥터 URL';
+    void vscode.window.showInformationMessage(`GPT Bridge: ${kind}를 복사했습니다 — ${url}`);
   });
 
   // ── 토큰 ────────────────────────────────────────────────────────
@@ -78,6 +82,7 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
     }
 
     const token = await secrets.regenerateAuthToken();
+    await server.refreshToken(); // 실행 중이면 기존 토큰을 즉시 무효화한다
     await vscode.env.clipboard.writeText(token);
     log.warn(`인증 토큰이 재발급되었습니다 (${maskToken(token)})`);
     void vscode.window.showInformationMessage(

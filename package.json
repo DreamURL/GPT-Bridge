@@ -162,15 +162,25 @@
     "build": "node esbuild.mjs",
     "build:prod": "node esbuild.mjs --production",
     "watch": "node esbuild.mjs --watch",
-    "compile": "npm run typecheck && npm run build",
+    "build:tests": "node esbuild.mjs --tests",
+    "test": "npm run build:tests && node --test --test-reporter=spec \"out-test/*.test.js\"",
+    "compile": "npm run typecheck && npm run build && npm test",
     "vscode:prepublish": "npm run typecheck && npm run build:prod",
     "package": "vsce package --allow-missing-repository"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/node": "^20.14.0",
     "@types/vscode": "^1.90.0",
     "@vscode/vsce": "^3.2.0",
     "esbuild": "^0.25.0",
     "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@vscode/ripgrep": "^1.18.0",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
+    "zod": "^4.4.3"
   }
 }

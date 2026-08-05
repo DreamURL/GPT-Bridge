@@ -1,7 +1,10 @@
 import * as esbuild from 'esbuild';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
+const tests = process.argv.includes('--tests');
 
 /**
  * @type {import('esbuild').BuildOptions}
@@ -28,7 +31,40 @@ const options = {
   logLevel: 'info'
 };
 
-if (watch) {
+/**
+ * 테스트 번들.
+ *
+ * PathGuard·거부 목록·인증 미들웨어는 vscode에 의존하지 않게 만들어 두었다.
+ * 덕분에 확장 개발 호스트 없이 `node --test`로 §11 케이스를 그대로 돌릴 수 있다.
+ */
+async function buildTests() {
+  const testDir = path.resolve('test');
+  const entryPoints = fs
+    .readdirSync(testDir)
+    .filter((name) => name.endsWith('.test.ts'))
+    .map((name) => path.join(testDir, name));
+
+  if (entryPoints.length === 0) {
+    throw new Error('테스트 파일을 찾지 못했습니다.');
+  }
+
+  await esbuild.build({
+    entryPoints,
+    bundle: true,
+    format: 'cjs',
+    platform: 'node',
+    target: 'node18',
+    outdir: 'out-test',
+    external: ['vscode'],
+    sourcemap: 'inline',
+    sourcesContent: false,
+    logLevel: 'warning'
+  });
+}
+
+if (tests) {
+  await buildTests();
+} else if (watch) {
   const ctx = await esbuild.context(options);
   await ctx.watch();
 } else {

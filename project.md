@@ -101,16 +101,27 @@ gpt-bridge/
 └─ media/                       Webview 정적 자원
 ```
 
-### 2.1 번들링 — ripgrep 네이티브 바이너리 (변경 4)
+### 2.1 번들링 — ripgrep 네이티브 바이너리 (변경 4, Phase 2에서 실측 반영)
 
-esbuild로 단일 번들을 만들 때 `@vscode/ripgrep`을 그냥 묶으면 **rg 실행 파일이 따라오지 않는다.** `rgPath`는 `node_modules/@vscode/ripgrep/bin/rg`를 가리키는 문자열일 뿐이고, 실제 바이너리는 postinstall로 내려받아 그 경로에 놓인 별도 파일이다. 번들러는 이를 모른다. Phase 5 패키징에서 "개발 중엔 되는데 `.vsix` 설치본에서만 rg를 못 찾는" 형태로 터진다.
+esbuild로 단일 번들을 만들 때 `@vscode/ripgrep`을 그냥 묶으면 **rg 실행 파일이 따라오지 않는다.** 실제 바이너리는 번들러가 알 수 없는 별도 파일이다. Phase 5 패키징에서 "개발 중엔 되는데 `.vsix` 설치본에서만 rg를 못 찾는" 형태로 터진다.
+
+> **rev.2 초안의 전제 두 가지가 실제와 달랐다** (`@vscode/ripgrep` 1.18 실측):
+>
+> 1. **패키지가 ESM 전용이다** (`"type": "module"`). 확장 번들은 CJS이고 VS Code 1.90의 Electron은 Node 20이라 `require()`로 ESM을 불러올 수 없다. → 패키지를 import하지 않고 `rgPath` 계산 로직만 재현한다.
+> 2. **바이너리가 `@vscode/ripgrep/bin/rg`에 없다.** 플랫폼별 optional 의존성(`@vscode/ripgrep-linux-x64/bin/rg` 등 12종)으로 분리되어 있고, 메타 패키지는 경로를 계산해 주는 ESM 모듈일 뿐이다. → `.vscodeignore` negation이 하나 더 필요하다.
 
 규칙:
 
 - esbuild `external: ['vscode', '@vscode/ripgrep']` — 런타임 `require`로 남긴다.
-- `.vscodeignore`에서 `node_modules/**`를 제외하되 `!node_modules/@vscode/ripgrep/**`로 되살린다.
-- 활성화 시 `fs.existsSync(rgPath)`를 확인하고, 없으면 검색·목록 툴을 비활성화한 뒤 사용자에게 명확히 알린다(조용한 실패 금지).
+- `.vscodeignore`에서 `node_modules/**`를 제외하되 **두 줄**로 되살린다:
+  ```
+  !node_modules/@vscode/ripgrep/**
+  !node_modules/@vscode/ripgrep-*/**
+  ```
+- rg 경로는 `require.resolve(`@vscode/ripgrep-${process.platform}-${process.arch}/bin/rg`)`로 구한다. 실패 시 확장 경로 기준 추정을 대비책으로 둔다.
+- 못 찾으면 `list_directory`·`search_text`를 **아예 등록하지 않고** 사용자에게 알린다. 목록에 있는데 부르면 실패하는 것보다 없는 편이 모델에게 정확한 정보다(조용한 실패 금지).
 - macOS·Linux에서 실행 권한(`0o755`)이 유지되는지 `.vsix` 설치본으로 실측한다.
+- **npm은 패키징하는 기기의 플랫폼 패키지만 설치한다.** 따라서 `.vsix`는 만든 OS/아키텍처에서만 검색이 동작한다. 다른 기기에 설치하려면 그 기기에서 다시 패키징해야 한다 — §10에 명시.
 - 대안(권장하지 않음): VS Code 내장 rg 경로(`process.execPath` 상대 경로) 추정 — 버전마다 위치가 달라 깨진다.
 
 *Phase 5 완료 기준에 "`.vsix` 설치본에서 `search_text` 동작 확인"을 명시한다.*
@@ -203,9 +214,10 @@ depth?: number   기본 1, 최대 3
 `rg`는 기본적으로 `.gitignore`·`.ignore`·`.rgignore`를 존중하므로 별도 파서가 필요 없고, `search_text`와 구현을 공유할 수 있다.
 
 ```
-rg --files --hidden --glob '!.git/**' -- <절대경로>
+rg --files --hidden --no-messages --glob '!.git/**' -- <절대경로>     (cwd = 워크스페이스 루트)
 ```
 
+- **rg는 반드시 cwd를 워크스페이스 루트로 고정해 실행한다.** `--glob` 패턴은 cwd 기준으로 매칭되므로, 임의의 cwd에서 실행하면 `!.git/**` 제외도 `include` 지정도 오류 없이 조용히 무효가 된다. Phase 2에서 실제로 이 상태였고 테스트로 잡았다.
 - `--hidden`을 주되 `.git/**`는 명시적으로 제외한다(거부 목록과 중복 방어).
 - 결과를 루트 상대 경로로 바꾼 뒤 `depth`로 잘라내고 디렉터리를 집계한다.
 - 거부 목록(§5.3)을 추가 적용한다. rg가 무시하지 않는 항목(`.env` 등)이 여기서 걸린다.
@@ -573,6 +585,7 @@ TunnelManager, 바이너리 다운로드/검증(§6.1 핀 고정 + 해시 테이
 6. **"저장 전까지 디스크 안전"은 텍스트 수정에만 해당한다.** 파일 생성·삭제·이름변경은 승인 즉시 디스크에 반영되며 Ctrl+Z로 완전히 되돌아가지 않는다(§4.2.1).
 7. 승인 확인 창은 타임아웃되어도 화면에서 사라지지 않는다. 만료 후 누른 선택은 무시되고 별도 알림이 뜬다(§5.4.1).
 8. 파일 목록·검색은 번들된 ripgrep 바이너리에 의존한다. 누락 시 해당 툴이 비활성화된다(§2.1).
+9. `.vsix`에는 **패키징한 기기의 플랫폼용 ripgrep 바이너리만** 들어간다. 다른 OS·아키텍처에서 쓰려면 그 기기에서 다시 패키징해야 한다(§2.1).
 
 ---
 

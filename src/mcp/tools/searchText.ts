@@ -1,0 +1,84 @@
+import { z } from 'zod';
+import { isListingExcluded } from '../../workspace/denyList';
+import { errorResult, textResult, wrapFileContent, type ToolContext, type ToolResult } from './types';
+
+export const SEARCH_TEXT_DESCRIPTION = `워크스페이스 전체에서 텍스트를 찾는다. 매치 줄과 앞뒤 2줄을 반환한다.
+
+언제 쓰나: 심볼·함수·문자열이 어디에 있는지 모를 때. 파일을 하나씩 열어 보는
+대신 이 툴로 위치를 먼저 특정한다.
+
+언제 쓰지 않나: 파일 경로를 이미 아는 경우에는 read_file이 낫다.
+파일 이름 자체를 찾을 때는 list_directory를 쓴다.
+
+호출 순서: search_text로 위치 확인 → read_file로 주변 맥락 확인 → edit_file
+
+검색은 대소문자를 구분한다. .gitignore 등재 파일과 node_modules는 제외된다.
+
+파라미터
+  query        찾을 문자열. 기본은 정규식이 아니라 그대로 매칭한다.
+  is_regex     true면 정규식으로 해석한다. 기본 false
+  include      대상을 좁히는 glob. 예: "src/**/*.ts"
+  max_results  최대 매치 수. 기본 50`;
+
+export const searchTextSchema = {
+  query: z.string().min(1).describe('찾을 문자열. 예: "createServer"'),
+  is_regex: z.boolean().optional().describe('true면 정규식으로 해석한다. 기본 false'),
+  include: z.string().optional().describe('대상을 좁히는 glob. 예: "src/**/*.ts"'),
+  max_results: z.number().int().min(1).max(200).optional().describe('최대 매치 수. 기본 50')
+};
+
+export interface SearchTextArgs {
+  query: string;
+  is_regex?: boolean | undefined;
+  include?: string | undefined;
+  max_results?: number | undefined;
+}
+
+export async function searchTextTool(ctx: ToolContext, args: SearchTextArgs): Promise<ToolResult> {
+  if (ctx.rg === undefined) {
+    return errorResult(
+      'ripgrep 바이너리를 찾을 수 없어 검색 기능을 사용할 수 없습니다. 확장을 다시 설치하세요.'
+    );
+  }
+
+  const outcome = await ctx.rg.search(ctx.root, {
+    query: args.query,
+    isRegex: args.is_regex ?? false,
+    include: args.include,
+    maxResults: args.max_results ?? 50
+  });
+
+  // 거부 목록·node_modules에 걸린 파일은 검색 결과에서도 제외한다.
+  // rg가 읽을 수 있더라도 내용이 모델에게 넘어가면 안 된다.
+  const visible = outcome.blocks.filter(
+    (block) => !ctx.guard.deny.isDenied(block.path) && !isListingExcluded(block.path)
+  );
+  const suppressed = outcome.blocks.length - visible.length;
+
+  if (visible.length === 0) {
+    const note = suppressed > 0 ? ` (${suppressed}개 파일은 접근이 차단되어 제외됨)` : '';
+    return textResult(`"${args.query}"에 대한 매치가 없습니다.${note}`);
+  }
+
+  const rendered = visible.map((block) => {
+    const width = String(Math.max(...block.lines.map((line) => line.number))).length;
+    const body = block.lines
+      .map((line) => {
+        const marker = line.isMatch ? '>' : ' ';
+        return `${marker}${String(line.number).padStart(width, ' ')}│ ${line.text}`;
+      })
+      .join('\n');
+    return wrapFileContent(block.path, body);
+  });
+
+  const notes: string[] = [];
+  if (outcome.truncated) {
+    notes.push('결과가 상한에 걸려 잘렸습니다. include나 max_results로 범위를 조정하세요.');
+  }
+  if (suppressed > 0) {
+    notes.push(`${suppressed}개 파일은 접근이 차단되어 제외했습니다.`);
+  }
+
+  const header = `"${args.query}" — ${visible.length}개 파일에서 ${outcome.matchCount}건 매치 ('>' 표시가 매치 줄)`;
+  return textResult([header, ...rendered, ...notes].join('\n\n'));
+}

@@ -72,7 +72,88 @@ npm audit           → 0 vulnerabilities
 
 ---
 
-## Phase 2 — 보안 기반 + 읽기 툴 (예정)
+## Phase 2 — 보안 기반 + 읽기 툴 ✅
 
-PathGuard와 거부 목록을 먼저 구현하고 §11 테스트를 통과시킨 뒤 MCP 서버·Bearer 인증·
-읽기 툴 5종을 붙인다. `workspace/ripgrep.ts`를 만들어 `list_directory`와 `search_text`가 공유한다.
+### 완료 항목
+
+| 항목 | 파일 | 비고 |
+|---|---|---|
+| glob 매처 | `src/workspace/glob.ts` | `*`, `**`, `?`만 지원. 대소문자 무시, 후행 부분경로도 매칭 |
+| 거부 목록 | `src/workspace/denyList.ts` | 기본 14종 + 설정 추가. `node_modules`는 목록에서만 제외 |
+| **PathGuard** | `src/workspace/PathGuard.ts` | vscode 비의존. §11 케이스 전부 차단 |
+| ripgrep 래퍼 | `src/workspace/ripgrep.ts` | 목록·검색 공유. `--json` 파싱, 타임아웃, 배열 인자 |
+| 문서 래퍼 | `src/workspace/documents.ts` | `openTextDocument`, 줄 번호 접두사, 범위 클램프 |
+| Bearer 인증 | `src/mcp/auth.ts` | 길이 선체크 → `timingSafeEqual`. 실패 사유 미노출 |
+| HTTP 서버 | `src/mcp/http.ts` | vscode 비의존. 127.0.0.1 바인드, 5MB, 120회/분 |
+| 툴 등록 | `src/mcp/registry.ts` | 공통 에러 처리·차단 알림·활동 기록 |
+| 생명주기 | `src/mcp/McpServer.ts` | 설정→PathGuard→rg→서버. EADDRINUSE 안내 |
+| 읽기 툴 5종 | `src/mcp/tools/*.ts` | 아래 표 참조 |
+
+### 툴
+
+| 툴 | 구현 |
+|---|---|
+| `get_workspace_info` | 루트명, 파일 수, 주요 언어, 열린 탭, 활성 파일+선택, 진단 요약 |
+| `list_directory` | rg `--files` 기반. `.gitignore` 반영. depth 1~3 |
+| `read_file` | 미저장 버퍼 우선. 줄 번호 접두사, `dirty` 표시, `maxReadBytes` |
+| `search_text` | rg `--json`, 앞뒤 2줄 컨텍스트, `-e`로 옵션 오인 방지 |
+| `get_diagnostics` | `languages.getDiagnostics()`. 워크스페이스 밖·거부 경로 제외 |
+
+### 테스트 — 51개 전부 통과
+
+```
+npm test   →  tests 51 / pass 51 / fail 0
+```
+
+| 파일 | 개수 | 범위 |
+|---|---|---|
+| `test/pathGuard.test.ts` | 20 | §11 경로 탈출·거부 목록 전부 + 오탐 방지 |
+| `test/server.test.ts` | 14 | 401 4종, 405, 헬스체크, EADDRINUSE, 레이트리밋 |
+| `test/ripgrep.test.ts` | 12 | `.gitignore` 반영, 컨텍스트, `-` 시작 질의, 상한 |
+| `test/auth.test.ts` | 5 | Bearer 파싱, 길이 불일치 시 예외 없음 |
+
+확장 호스트 없이 `node --test`로 돌아간다. PathGuard·auth·http·ripgrep을 vscode
+비의존으로 설계했기 때문이다. esbuild가 테스트도 번들한다(`npm run build:tests`).
+
+### 구현 중 발견한 사실 (기획안 정정)
+
+1. **`@vscode/ripgrep` 1.18은 ESM 전용이고 바이너리 위치가 다르다.**
+   메타 패키지는 경로 계산용 ESM 모듈이고, 실제 rg는 플랫폼별 optional 패키지
+   (`@vscode/ripgrep-linux-x64/bin/rg`)에 있다. CJS 번들에서 `require`할 수 없으므로
+   패키지를 import하지 않고 `require.resolve`로 경로만 구한다. `.vscodeignore`
+   negation도 두 줄이 필요했다. → project.md §2.1 정정, §10-9 추가.
+
+2. **rg의 `--glob`은 cwd 기준으로 매칭된다.**
+   cwd를 지정하지 않고 실행하면 `!.git/**` 제외와 `include` 지정이 오류 없이
+   조용히 무효가 된다. 실제로 `.git/config`가 검색 결과에 나왔고 테스트로 잡았다.
+   cwd를 워크스페이스 루트로 고정해 해결. → project.md §4.1 정정.
+   (거부 목록이 툴 계층에서 한 번 더 걸러 주고 있어 실제 유출은 없었다. 다층 방어가 작동한 사례.)
+
+3. **`exactOptionalPropertyTypes`를 껐다.** MCP SDK의 `Transport` 인터페이스가
+   `onclose?: () => void`로 선언되어 있는데 구현 클래스는 `(() => void) | undefined`라
+   이 플래그와 충돌한다. 캐스팅으로 우회하는 대신 플래그를 뺐다.
+   기획안이 요구하는 `strict: true`는 그대로다.
+
+4. **무상태(stateless) 모드를 선택했다.** SDK가 무상태에서 transport 재사용을
+   거부하므로 요청마다 `McpServer` + transport를 새로 만들고 응답 종료 시 정리한다.
+   세션 맵이 없어 커넥터가 끊겨도 서버에 찌꺼기가 남지 않는다.
+
+### 미해결 / 다음 Phase로 넘김
+
+- **MCP Inspector 실측 미완.** GUI 없는 원격 컨테이너라 확장 호스트를 띄울 수 없다.
+  HTTP·인증·transport 계층은 통합 테스트로 검증했지만, vscode API를 쓰는 툴 5종의
+  실제 동작(진단 수집, 미저장 버퍼 읽기, 탭 목록)은 로컬 F5 확인이 필요하다.
+- **SSE vs JSON 응답 형식.** 현재 SDK 기본값(SSE 스트림)을 쓴다. ChatGPT 커넥터가
+  `enableJsonResponse: true`를 요구하면 Phase 3에서 조정한다.
+- **DNS 리바인딩 보호 미적용.** `allowedHosts`를 켜면 터널 도메인을 화이트리스트에
+  넣어야 하는데 Quick Tunnel은 URL이 매번 바뀐다. 루프백 바인드 + Bearer + CORS 미적용으로
+  대응하고 Phase 3에서 Named Tunnel 고정 도메인이 생기면 재검토한다.
+- **TOCTOU.** PathGuard가 경로를 검증한 뒤 툴이 파일을 여는 사이에 심볼릭 링크가
+  바뀔 수 있다. 개인 사용 전제라 현재는 감수한다.
+- `any` 금지 컴파일러 강제는 여전히 미적용(Phase 1에서 이월).
+
+---
+
+## Phase 3 — 터널 + 패널 (예정)
+
+TunnelManager, cloudflared 버전 핀 + SHA256 상수 테이블(§6.1), Webview 패널 실제 구현.

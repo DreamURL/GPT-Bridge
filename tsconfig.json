@@ -4,7 +4,7 @@
     "moduleResolution": "Node16",
     "target": "ES2022",
     "lib": ["ES2022"],
-    "rootDir": "src",
+    "rootDir": ".",
     "sourceMap": true,
     "noEmit": true,
 
@@ -15,9 +15,8 @@
     "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "exactOptionalPropertyTypes": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts"]
 }
