@@ -15,6 +15,8 @@ import { PathError, PathGuard } from '../src/workspace/PathGuard';
 let sandbox: string;
 let root: string;
 let guard: PathGuard;
+let dirLinksAvailable = false;
+let fileLinksAvailable = false;
 
 before(async () => {
   // 루트가 /work일 때 /work-secret이 통과하는지 확인하려면
@@ -41,11 +43,26 @@ before(async () => {
   await fs.writeFile(path.join(sibling, 'a.txt'), 'sibling secret\n');
   await fs.writeFile(path.join(sandbox, 'outside.txt'), 'outside\n');
 
-  // 워크스페이스 밖을 가리키는 심볼릭 링크
-  await fs.symlink(sandbox, path.join(root, 'escape-link'), 'dir');
-  await fs.symlink(path.join(sandbox, 'outside.txt'), path.join(root, 'escape-file'), 'file');
-  // 워크스페이스 안을 가리키는 정상 링크 (오탐 확인용)
-  await fs.symlink(path.join(root, 'src'), path.join(root, 'src-link'), 'dir');
+  // 워크스페이스 밖을 가리키는 심볼릭 링크.
+  //
+  // Windows에서 파일 심볼릭 링크를 만들려면 관리자 권한이나 개발자 모드가
+  // 필요하다. 디렉터리는 junction으로 대신할 수 있어 권한 없이도 만들어진다.
+  // 링크를 만들지 못한 경우 해당 테스트를 조용히 통과시키지 않고 건너뛴다.
+  const dirLinkType = process.platform === 'win32' ? 'junction' : 'dir';
+  try {
+    await fs.symlink(sandbox, path.join(root, 'escape-link'), dirLinkType);
+    await fs.symlink(path.join(root, 'src'), path.join(root, 'src-link'), dirLinkType);
+    dirLinksAvailable = true;
+  } catch {
+    dirLinksAvailable = false;
+  }
+
+  try {
+    await fs.symlink(path.join(sandbox, 'outside.txt'), path.join(root, 'escape-file'), 'file');
+    fileLinksAvailable = true;
+  } catch {
+    fileLinksAvailable = false;
+  }
 
   guard = new PathGuard({ root });
 });
@@ -96,16 +113,79 @@ describe('§11 경로 탈출', () => {
     await expectBlocked('\0');
   });
 
-  it('워크스페이스 외부를 가리키는 심볼릭 링크', async () => {
+  it('워크스페이스 외부를 가리키는 디렉터리 링크', async (t) => {
+    if (!dirLinksAvailable) {
+      t.skip('이 환경에서는 디렉터리 링크를 만들 수 없습니다');
+      return;
+    }
     await expectBlocked('escape-link/outside.txt');
-    await expectBlocked('escape-file');
     // 링크 하위의 아직 없는 파일도 조상 링크를 해석해 막아야 한다
     await expectBlocked('escape-link/not-yet-created.txt');
+  });
+
+  it('워크스페이스 외부를 가리키는 파일 링크', async (t) => {
+    if (!fileLinksAvailable) {
+      // Windows에서 파일 심볼릭 링크는 관리자 권한이나 개발자 모드가 필요하다.
+      t.skip('이 환경에서는 파일 링크를 만들 수 없습니다');
+      return;
+    }
+    await expectBlocked('escape-file');
   });
 
   it('접두사가 겹치는 형제 디렉터리 (/work vs /work-secret)', async () => {
     await expectBlocked('../work-secret/a.txt');
     await expectBlocked(path.join(sandbox, 'work-secret', 'a.txt'));
+  });
+});
+
+describe('Windows 경로 정규화 우회', () => {
+  // Windows는 파일을 열 때 경로를 정규화한다. 그 결과 거부 목록의 문자열과
+  // 실제로 열리는 파일이 달라질 수 있다. 아래는 전부 그 틈을 노리는 형태다.
+  // 검사는 플랫폼과 무관하게 동작해야 한다 — Linux에서 만든 저장소를
+  // Windows에서 열었을 때가 바로 문제 상황이기 때문이다.
+
+  it('대체 데이터 스트림(ADS)을 차단한다', async () => {
+    // '.env::$DATA'는 Windows에서 .env 본문을 그대로 읽는다.
+    await expectBlocked('.env::$DATA');
+    await expectBlocked('.env:hidden');
+    await expectBlocked('src/app.ts:stream');
+  });
+
+  it('후행 마침표를 차단한다', async () => {
+    // Windows는 '.npmrc.'를 열 때 '.npmrc'로 정규화한다.
+    await expectBlocked('.npmrc.');
+    await expectBlocked('.netrc.');
+    await expectBlocked('src/.npmrc..');
+  });
+
+  it('후행 공백을 차단한다', async () => {
+    await expectBlocked('.npmrc ');
+    await expectBlocked('src/.npmrc /x.txt');
+  });
+
+  it('예약 장치명을 차단한다', async () => {
+    // 열면 프로세스가 멈출 수 있다.
+    await expectBlocked('CON');
+    await expectBlocked('con');
+    await expectBlocked('NUL');
+    await expectBlocked('COM1');
+    await expectBlocked('LPT9');
+    await expectBlocked('AUX.txt'); // 확장자가 붙어도 여전히 장치다
+    await expectBlocked('src/CON');
+  });
+
+  it('드라이브 상대 경로를 차단한다', async () => {
+    // path.isAbsolute('C:a.txt')는 win32에서도 false라 별도 검사가 필요하다.
+    await expectBlocked('C:a.txt');
+    await expectBlocked('c:../secret.txt');
+  });
+
+  it('장치명과 비슷하지만 다른 정상 파일명은 통과한다', async () => {
+    for (const name of ['console.ts', 'connection.js', 'com.example.json', 'aux-helper.ts']) {
+      await fs.writeFile(path.join(root, 'src', name), '\n');
+      const resolved = await guard.resolve(`src/${name}`);
+      assert.equal(resolved.relative, `src/${name}`);
+    }
   });
 });
 
@@ -174,7 +254,11 @@ describe('정상 경로는 통과한다', () => {
     assert.equal(resolved.relative, 'node_modules/left-pad/index.js');
   });
 
-  it('워크스페이스 안을 가리키는 링크는 실제 경로로 정규화된다', async () => {
+  it('워크스페이스 안을 가리키는 링크는 실제 경로로 정규화된다', async (t) => {
+    if (!dirLinksAvailable) {
+      t.skip('이 환경에서는 디렉터리 링크를 만들 수 없습니다');
+      return;
+    }
     const resolved = await guard.resolve('src-link/app.ts');
     assert.equal(resolved.relative, 'src/app.ts');
   });

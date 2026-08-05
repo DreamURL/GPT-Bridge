@@ -246,12 +246,22 @@ export class TunnelManager {
   /**
    * SIGTERM 후 5초 뒤 SIGKILL (project.md §6).
    * 확장 호스트 리로드 시 좀비 프로세스가 남으면 포트가 계속 물린다.
+   *
+   * Windows에는 시그널이 없다. Node의 kill()은 TerminateProcess로 매핑되어
+   * **해당 프로세스만** 죽이고 자식 프로세스는 그대로 남는다. cloudflared가
+   * 자식을 띄우는 경우 좀비가 남으므로 `taskkill /T`로 트리째 정리한다.
    */
   private killChild(): Promise<void> {
     const child = this.child;
     if (child === undefined || child.exitCode !== null) {
       this.child = undefined;
       return Promise.resolve();
+    }
+
+    this.child = undefined;
+
+    if (process.platform === 'win32') {
+      return this.killProcessTreeWindows(child);
     }
 
     return new Promise((resolve) => {
@@ -270,7 +280,45 @@ export class TunnelManager {
 
       child.once('exit', done);
       child.kill('SIGTERM');
-      this.child = undefined;
+    });
+  }
+
+  private killProcessTreeWindows(child: ChildProcess): Promise<void> {
+    const pid = child.pid;
+    if (pid === undefined) {
+      child.kill();
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      const settle = (): void => {
+        clearTimeout(fallbackTimer);
+        resolve();
+      };
+
+      // taskkill이 응답하지 않아도 무한정 기다리지 않는다.
+      const fallbackTimer = setTimeout(() => {
+        if (child.exitCode === null) {
+          child.kill();
+        }
+        resolve();
+      }, SIGKILL_DELAY_MS);
+
+      const killer = spawn('taskkill', ['/pid', String(pid), '/T', '/F'], {
+        stdio: 'ignore',
+        windowsHide: true
+      });
+
+      killer.on('error', (error) => {
+        this.options.log.warn(`taskkill 실행 실패: ${error.message}. 직접 종료를 시도합니다.`);
+        child.kill();
+        settle();
+      });
+
+      killer.on('exit', () => {
+        this.options.log.info(`cloudflared 프로세스 트리를 종료했습니다 (pid ${pid})`);
+        settle();
+      });
     });
   }
 

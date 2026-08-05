@@ -241,7 +241,48 @@ npm test   →  tests 79 / pass 79 / fail 0
 
 ---
 
+## Windows 대응 (Phase 3 이후 추가)
+
+대상 환경이 Windows임을 확인하고 점검한 결과, **실제 우회 경로 3개**를 찾아 막았다.
+전부 Windows에서만 성립해 Linux 테스트로는 드러나지 않던 것들이다.
+
+| 입력 | 이전 동작 | Windows에서 실제로 열리는 것 |
+|---|---|---|
+| `.env::$DATA` | 통과 — `.env` glob과 문자열 불일치 | `.env` 본문 |
+| `.npmrc.` | 통과 — 후행 마침표 | `.npmrc` |
+| `CON`, `COM1` | 통과 | 장치. `openTextDocument`가 멈출 수 있음 |
+
+거부 목록은 문자열 매칭이라 목록을 늘려도 이 틈은 막히지 않는다. `PathGuard`
+입력 단계에서 콜론·후행 마침표/공백·예약 장치명·드라이브 상대 경로를 차단한다.
+**검사는 플랫폼과 무관하게 항상 동작한다** — 문제 상황이 "다른 데서 만든 저장소를
+Windows에서 여는 것"이기 때문이다. → project.md §5.3.1 신설.
+
+`path.isAbsolute('C:a.txt')`가 win32에서도 `false`라는 점도 확인했다. 드라이브 상대
+경로는 절대 경로 검사로 잡히지 않아 별도 규칙이 필요하다.
+
+그 외 반영:
+
+- **프로세스 트리 종료.** Windows에는 시그널이 없다. Node의 `kill()`은
+  `TerminateProcess`로 매핑되어 해당 프로세스만 죽이고 자식은 남는다.
+  `taskkill /T /F`로 트리째 정리한다. §11의 "리로드 후 좀비 프로세스 없음"이
+  Windows에서도 성립하게 하려면 필요하다.
+- **심볼릭 링크 테스트.** Windows에서 파일 링크는 권한이 필요하다. 디렉터리는
+  junction으로 대체하고, 만들지 못하면 `t.skip()`으로 건너뛴다 — 조용히 통과시키지 않는다.
+- **패키징 위치.** `.vsix`는 Windows에서 만들어야 `rg.exe`가 들어간다. README에 명시.
+
+테스트 86개 통과 (Windows 케이스 7개 추가).
+
+### Phase 4에서 반드시 처리할 것 — CRLF
+
+`TextDocument.getText()`는 문서의 EOL을 그대로 반환한다. CRLF 파일에서는 `\r\n`이
+섞여 나오는데, GPT는 거의 항상 `\n`으로 `old_string`을 보낸다. 정규화 없이 비교하면
+**Windows의 CRLF 파일에서 `edit_file`이 항상 0회 매치로 실패한다.** 주력 툴이
+무력해지므로 Phase 4의 첫 작업으로 처리한다. → project.md §4.2 `edit_file`에 명시.
+
+---
+
 ## Phase 4 — 쓰기 + 승인 (예정)
 
 `edit_file` / `write_file` / `create_directory` / `delete_path`,
 ApprovalGate 직렬 큐 + nonce 만료(§5.4.1), DiffPreview.
+첫 작업은 위의 CRLF 정규화.

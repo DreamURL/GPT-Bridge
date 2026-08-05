@@ -28,6 +28,52 @@ export interface PathGuardOptions {
 
 const WINDOWS_DRIVE = /^[A-Za-z]:/;
 
+/**
+ * Windows 예약 장치명. 확장자가 붙어도(`CON.txt`) 여전히 장치를 가리킨다.
+ * 열면 프로세스가 멈출 수 있다.
+ */
+const WINDOWS_DEVICE_NAMES = new Set([
+  'con', 'prn', 'aux', 'nul',
+  'com0', 'com1', 'com2', 'com3', 'com4', 'com5', 'com6', 'com7', 'com8', 'com9',
+  'lpt0', 'lpt1', 'lpt2', 'lpt3', 'lpt4', 'lpt5', 'lpt6', 'lpt7', 'lpt8', 'lpt9'
+]);
+
+/**
+ * Windows 파일시스템이 경로를 정규화하는 방식 때문에 생기는 우회를 막는다.
+ *
+ * 이 검사는 **모든 플랫폼에서** 동작한다. 플랫폼별로 다르게 판정하면
+ * 어느 쪽이 안전한지 추론하기 어려워지고, 여기서 걸리는 이름들은 정상적인
+ * 프로젝트에 거의 등장하지 않는다.
+ *
+ *  - `:`      대체 데이터 스트림(ADS). `.env::$DATA`는 `.env` 본문을 그대로 읽는다.
+ *             거부 목록은 `.env`와 문자열이 달라 걸러내지 못한다.
+ *  - 후행 `.` / 공백
+ *             Windows는 열 때 잘라낸다. `.npmrc.`는 `.npmrc`가 되지만
+ *             거부 목록의 `.npmrc` 패턴에는 매칭되지 않는다.
+ *  - 예약 장치명
+ *             `CON`, `COM1` 등은 파일이 아니라 장치다.
+ */
+function assertNoWindowsTricks(userPath: string): void {
+  if (userPath.includes(':')) {
+    throw new PathError('경로에 콜론을 사용할 수 없습니다');
+  }
+
+  for (const segment of userPath.split('/')) {
+    if (segment.length === 0 || segment === '.' || segment === '..') {
+      continue;
+    }
+
+    if (segment.endsWith('.') || segment.endsWith(' ')) {
+      throw new PathError('경로 구성요소는 마침표나 공백으로 끝날 수 없습니다');
+    }
+
+    const stem = segment.split('.')[0]?.toLowerCase() ?? '';
+    if (WINDOWS_DEVICE_NAMES.has(stem)) {
+      throw new PathError(`예약된 장치명은 사용할 수 없습니다: ${segment}`);
+    }
+  }
+}
+
 function isNotFound(error: unknown): boolean {
   return (
     typeof error === 'object' &&
@@ -158,6 +204,8 @@ export class PathGuard {
     }
 
     if (WINDOWS_DRIVE.test(userPath)) {
+      // path.isAbsolute('C:a.txt')는 win32에서도 false다. 드라이브 상대 경로는
+      // 여기서 잡아야 한다.
       throw new PathError('상대 경로만 허용됩니다');
     }
 
@@ -166,6 +214,8 @@ export class PathGuard {
     }
 
     const trimmed = userPath.trim();
+    assertNoWindowsTricks(trimmed);
+
     return trimmed.length === 0 ? '.' : trimmed;
   }
 
