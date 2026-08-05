@@ -9,6 +9,7 @@ export interface BridgeConfig {
   readonly port: number;
   readonly autoStart: boolean;
   readonly tunnelProvider: TunnelProvider;
+  readonly tunnelHostname: string | undefined;
   readonly approvalMode: ApprovalMode;
   readonly autoApprovePatterns: readonly string[];
   readonly approvalTimeoutSeconds: number;
@@ -23,6 +24,12 @@ function isApprovalMode(value: string): value is ApprovalMode {
 
 function isTunnelProvider(value: string): value is TunnelProvider {
   return value === 'cloudflare' || value === 'none';
+}
+
+/** 빈 문자열 설정은 '미지정'으로 취급한다. */
+function normalizeOptional(value: string): string | undefined {
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? undefined : trimmed;
 }
 
 function stringArray(value: readonly unknown[]): string[] {
@@ -46,6 +53,7 @@ export function readConfig(): BridgeConfig {
     port: cfg.get<number>('port', 3737),
     autoStart: cfg.get<boolean>('autoStart', false),
     tunnelProvider: isTunnelProvider(rawProvider) ? rawProvider : 'cloudflare',
+    tunnelHostname: normalizeOptional(cfg.get<string>('tunnel.hostname', '')),
     approvalMode: isApprovalMode(rawApprovalMode) ? rawApprovalMode : 'always',
     autoApprovePatterns: stringArray(cfg.get<unknown[]>('approval.autoApprovePatterns', [])),
     approvalTimeoutSeconds: cfg.get<number>('approval.timeoutSeconds', 90),

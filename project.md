@@ -169,6 +169,8 @@ esbuild로 단일 번들을 만들 때 `@vscode/ripgrep`을 그냥 묶으면 **r
         "gptBridge.port":            { "type": "number",  "default": 3737 },
         "gptBridge.autoStart":       { "type": "boolean", "default": false },
         "gptBridge.tunnel.provider": { "type": "string",  "enum": ["cloudflare", "none"], "default": "cloudflare" },
+        "gptBridge.tunnel.hostname": { "type": "string",  "default": "",
+          "description": "Named Tunnel의 공개 호스트명. 토큰만으로는 알아낼 수 없어 직접 지정한다(§6.2)." },
         "gptBridge.approval.mode":   { "type": "string",  "enum": ["always", "session", "pattern"], "default": "always" },
         "gptBridge.approval.autoApprovePatterns": { "type": "array", "default": [], "items": { "type": "string" } },
         "gptBridge.approval.timeoutSeconds": { "type": "number", "default": 90,
@@ -479,19 +481,30 @@ GPT가 ${relPath} 삭제를 요청했습니다.
 - 30초 헬스체크, 끊기면 지수 백오프로 최대 3회 재시작
 - **`deactivate()`에서 반드시 정리**: SIGTERM 후 5초 뒤 SIGKILL. 확장 호스트 리로드 시 좀비 프로세스가 남으면 포트가 계속 물린다.
 
-### 6.1 바이너리 검증 — 해시는 우리가 관리한다 (변경 5)
+### 6.1 바이너리 검증 — 해시는 우리가 관리한다 (변경 5, Phase 3에서 실측 반영)
 
 Cloudflare는 릴리스마다 전 플랫폼에 대해 일관된 체크섬 목록을 게시하지 않는다. "다운로드 페이지에서 sha256을 받아 대조"하는 흐름은 실제로는 **최초 접속을 신뢰하는(TOFU) 검증**으로 퇴화하고, 그 경우 §6의 SHA256 검증은 방어 가치가 거의 없다.
 
 설계:
 
-- `cloudflared` **릴리스 버전을 코드에 핀으로 고정**한다(예: `2024.x.y`). `latest`를 받지 않는다.
-- 지원 플랫폼(`darwin-arm64`, `darwin-amd64`, `linux-amd64`, `windows-amd64`)별 SHA256을 `binary.ts`의 상수 테이블에 직접 박는다. 값은 개발 시점에 수동으로 확인해 커밋하며, 이 커밋 자체가 신뢰 근거가 된다.
-- 다운로드는 HTTPS + 리다이렉트 호스트 화이트리스트(`github.com`, `objects.githubusercontent.com`)로 제한한다.
-- 해시 불일치 → 즉시 파일 삭제, 터널 시작 중단, 사용자에게 경고. **재시도로 우회하지 않는다.**
+- `cloudflared` **릴리스 버전을 코드에 핀으로 고정**한다. 현재 `2026.7.3`. `latest`를 받지 않는다.
+- 지원 플랫폼(`linux-x64`, `linux-arm64`, `darwin-x64`, `darwin-arm64`, `win32-x64`)별 SHA256을 `binary.ts`의 상수 테이블에 직접 박는다. 값은 개발 시점에 각 자산을 내려받아 확인하고 커밋하며, 이 커밋 자체가 신뢰 근거가 된다.
+- **해시는 플랫폼마다 두 개를 기록한다.**
+  - `assetSha256` — 내려받은 자산 그대로. 다운로드 직후 검증.
+  - `binarySha256` — 디스크에 놓이는 실행 파일. 재사용 시 검증.
+
+  macOS 자산은 raw 바이너리가 아니라 **`.tgz` 아카이브**(안에 `cloudflared` 파일 하나)라서 두 값이 다르다. 하나만 기록하면 아카이브 플랫폼의 재사용 검증이 "파일 존재 확인"으로 퇴화한다. 아카이브 해제는 외부 `tar` 프로세스를 띄우지 않고 최소 tar 리더로 직접 처리한다(의존성 없이 테스트 가능).
+- 다운로드는 HTTPS + 리다이렉트 호스트 화이트리스트로 제한하고, **리다이렉트를 직접 따라가며 매 홉마다 호스트를 검사한다.** fetch의 자동 리다이렉트에 맡기면 어디를 거쳤는지 확인할 수 없다. 허용 호스트는 `github.com`, `release-assets.githubusercontent.com`, `objects.githubusercontent.com` — 현재 GitHub은 첫 번째에서 두 번째로 넘긴다(초안이 적은 `objects.*`는 예전 호스트라 함께 유지).
+- 해시 불일치 → 즉시 중단, 터널 시작 포기, 사용자에게 경고. **재시도로 우회하지 않는다.**
 - 다운로드는 임시 파일에 받아 검증 후 원자적 rename. 부분 다운로드가 유효한 바이너리로 남지 않게 한다.
 - 버전 갱신은 상수 테이블 수정으로만 이루어진다. 자동 업데이트 없음.
-- 사용자가 이미 설치한 `cloudflared`(PATH 상)를 쓰는 옵션도 허용하되, 이 경로는 해시 검증을 건너뛴다는 사실을 로그에 남긴다.
+- Windows arm64용 자산은 존재하지 않는다. 미지원 플랫폼은 명확한 메시지와 함께 터널을 포기하되, 로컬 엔드포인트는 계속 살려 둔다.
+
+### 6.2 Named Tunnel의 공개 호스트명
+
+`cloudflared tunnel run --token <토큰>`은 인그레스 설정이 Cloudflare 대시보드 쪽에 있어 **공개 호스트명을 stdout으로 알려주지 않는다.** 토큰만으로 URL을 알아낼 수 없다.
+
+따라서 `gptBridge.tunnel.hostname` 설정을 두고 사용자가 직접 지정하게 한다. 미지정 상태로 Named Tunnel을 돌리면 터널은 동작하지만 패널에 URL을 표시할 수 없고, 그 사실을 안내한다.
 
 ---
 
@@ -586,6 +599,8 @@ TunnelManager, 바이너리 다운로드/검증(§6.1 핀 고정 + 해시 테이
 7. 승인 확인 창은 타임아웃되어도 화면에서 사라지지 않는다. 만료 후 누른 선택은 무시되고 별도 알림이 뜬다(§5.4.1).
 8. 파일 목록·검색은 번들된 ripgrep 바이너리에 의존한다. 누락 시 해당 툴이 비활성화된다(§2.1).
 9. `.vsix`에는 **패키징한 기기의 플랫폼용 ripgrep 바이너리만** 들어간다. 다른 OS·아키텍처에서 쓰려면 그 기기에서 다시 패키징해야 한다(§2.1).
+10. Named Tunnel을 쓰면 공개 호스트명을 `gptBridge.tunnel.hostname`에 직접 지정해야 한다. 토큰만으로는 알아낼 수 없다(§6.2).
+11. Windows arm64에서는 터널을 쓸 수 없다(cloudflared가 해당 자산을 배포하지 않는다). 로컬 엔드포인트는 정상 동작한다.
 
 ---
 

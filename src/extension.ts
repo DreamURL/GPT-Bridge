@@ -8,6 +8,12 @@ import { BridgeViewProvider } from './ui/BridgeViewProvider';
 import { createLogger } from './ui/output';
 import { StatusBar } from './ui/statusBar';
 
+/**
+ * deactivate에서 터널 프로세스를 확실히 정리하기 위해 참조를 남긴다.
+ * context.subscriptions의 dispose()는 동기라 자식 프로세스 종료를 기다리지 못한다.
+ */
+let activeServer: BridgeServer | undefined;
+
 export function activate(context: vscode.ExtensionContext): void {
   // Disposable은 예외 없이 context.subscriptions에 등록한다 (project.md §0).
   // 확장 호스트는 리로드가 잦아 정리 누락 시 포트·프로세스가 누수된다.
@@ -37,19 +43,33 @@ export function activate(context: vscode.ExtensionContext): void {
     store,
     secrets,
     extensionPath: context.extensionUri.fsPath,
+    storageDir: context.globalStorageUri.fsPath,
     onActivity: (entry) => {
       const mark = entry.blocked === true ? '차단' : entry.ok ? 'ok' : '실패';
       log.info(`[${mark}] ${entry.tool} ${entry.detail} (${entry.durationMs}ms)`);
+      view.pushActivity(entry);
     }
   });
   context.subscriptions.push(server);
+  activeServer = server;
 
   statusBar.update(store.current);
-  registerCommands(context, { log, store, secrets, server });
+  registerCommands(context, {
+    log,
+    store,
+    secrets,
+    server,
+    onTokenChanged: (token) => view.setTokenPreview(token)
+  });
+
+  // 이미 발급된 토큰이 있으면 패널에 마스킹해 보여 준다.
+  void secrets.getAuthToken().then((token) => view.setTokenPreview(token));
 
   context.subscriptions.push(
     onConfigChange((config) => {
       log.info(`설정 변경 감지 — port=${config.port}, approval=${config.approvalMode}`);
+      // 패널의 승인 모드·자동 저장 표시가 설정과 어긋나지 않게 다시 그린다.
+      view.render(store.current);
     })
   );
 
@@ -72,7 +92,15 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 }
 
-export function deactivate(): void {
-  // 서버는 context.subscriptions에 등록된 BridgeServer.dispose()가 닫는다.
-  // Phase 3에서 cloudflared 프로세스 종료(SIGTERM → 5초 → SIGKILL)를 여기에 붙인다.
+/**
+ * VS Code는 deactivate가 돌려준 Promise를 기다린다. 여기서 cloudflared를
+ * SIGTERM → 5초 → SIGKILL로 정리한다. 이걸 빠뜨리면 확장 호스트가 리로드될 때
+ * 좀비 프로세스가 남아 포트를 계속 물고 있게 된다 (project.md §6).
+ */
+export async function deactivate(): Promise<void> {
+  const server = activeServer;
+  activeServer = undefined;
+  if (server !== undefined) {
+    await server.stop();
+  }
 }

@@ -10,10 +10,12 @@ export interface CommandDeps {
   readonly store: BridgeStateStore;
   readonly secrets: SecretStore;
   readonly server: BridgeServer;
+  /** 토큰이 새로 만들어지거나 바뀌었을 때 패널 표시를 갱신한다. */
+  readonly onTokenChanged: (token: string | undefined) => void;
 }
 
 export function registerCommands(context: vscode.ExtensionContext, deps: CommandDeps): void {
-  const { log, store, secrets, server } = deps;
+  const { log, store, secrets, server, onTokenChanged } = deps;
 
   const register = (id: string, handler: () => void | Promise<void>): void => {
     context.subscriptions.push(
@@ -45,8 +47,7 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
   register('gptBridge.copyUrl', async () => {
     const { tunnelUrl, port } = store.current;
 
-    // 터널은 Phase 3에서 붙는다. 그전까지는 로컬 주소를 준다 —
-    // MCP Inspector로 확인할 때 필요하다.
+    // 터널이 아직 안 붙었으면 로컬 주소를 준다 — MCP Inspector로 확인할 때 필요하다.
     const url = tunnelUrl ?? (port === undefined ? undefined : `http://127.0.0.1:${port}${MCP_ENDPOINT}`);
     if (url === undefined) {
       void vscode.window.showWarningMessage(
@@ -63,6 +64,7 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
   // ── 토큰 ────────────────────────────────────────────────────────
   register('gptBridge.copyToken', async () => {
     const token = await secrets.ensureAuthToken();
+    onTokenChanged(token);
     await vscode.env.clipboard.writeText(token);
     log.info(`인증 토큰을 클립보드에 복사했습니다 (${maskToken(token)})`);
     void vscode.window.showInformationMessage(
@@ -82,6 +84,7 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
     }
 
     const token = await secrets.regenerateAuthToken();
+    onTokenChanged(token);
     await server.refreshToken(); // 실행 중이면 기존 토큰을 즉시 무효화한다
     await vscode.env.clipboard.writeText(token);
     log.warn(`인증 토큰이 재발급되었습니다 (${maskToken(token)})`);
@@ -114,9 +117,18 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
 
     await secrets.setTunnelToken(trimmed);
     log.info('터널 토큰을 저장했습니다');
-    void vscode.window.showInformationMessage(
-      'GPT Bridge: 터널 토큰을 저장했습니다. 적용은 Phase 3에서 터널이 붙을 때 이루어집니다.'
+
+    const message = server.isRunning
+      ? 'GPT Bridge: 터널 토큰을 저장했습니다. 적용하려면 서버를 다시 시작하세요.'
+      : 'GPT Bridge: 터널 토큰을 저장했습니다. 공개 호스트명은 gptBridge.tunnel.hostname 설정에 지정하세요.';
+    const choice = await vscode.window.showInformationMessage(
+      message,
+      ...(server.isRunning ? ['다시 시작'] : [])
     );
+    if (choice === '다시 시작') {
+      await server.stop();
+      await server.start();
+    }
   });
 
   // ── 안내 ────────────────────────────────────────────────────────

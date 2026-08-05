@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import { readConfig, type BridgeConfig } from '../config';
 import type { SecretStore } from '../secrets';
 import type { BridgeStateStore } from '../state';
+import { ensureCloudflared } from '../tunnel/binary';
+import { TunnelManager } from '../tunnel/TunnelManager';
 import { PathGuard } from '../workspace/PathGuard';
 import { Ripgrep, resolveRgPath } from '../workspace/ripgrep';
 import { McpHttpServer, MCP_ENDPOINT, PortInUseError } from './http';
@@ -13,6 +15,8 @@ export interface BridgeServerDeps {
   readonly store: BridgeStateStore;
   readonly secrets: SecretStore;
   readonly extensionPath: string;
+  /** cloudflared 바이너리를 두는 곳 (context.globalStorageUri). */
+  readonly storageDir: string;
   readonly onActivity: (entry: ActivityEntry) => void;
 }
 
@@ -22,6 +26,7 @@ export interface BridgeServerDeps {
  */
 export class BridgeServer implements vscode.Disposable {
   private http: McpHttpServer | undefined;
+  private tunnel: TunnelManager | undefined;
   private token: string | undefined;
   private starting = false;
 
@@ -108,6 +113,13 @@ export class BridgeServer implements vscode.Disposable {
       this.http = http;
       this.deps.store.update({ status: 'running', port, message: undefined });
       this.deps.log.info(`로컬 엔드포인트: http://127.0.0.1:${port}${MCP_ENDPOINT}`);
+
+      if (config.tunnelProvider === 'cloudflare') {
+        // 터널 실패는 서버 실패가 아니다. 로컬 엔드포인트는 계속 살아 있다.
+        void this.startTunnel(port);
+      } else {
+        this.deps.log.info('터널 제공자가 none이라 로컬에서만 접근할 수 있습니다.');
+      }
     } catch (error) {
       await this.stop();
 
@@ -133,7 +145,81 @@ export class BridgeServer implements vscode.Disposable {
     }
   }
 
+  /**
+   * 터널 기동. 바이너리 확보(해시 검증 포함) → cloudflared 실행 → URL 파싱.
+   * 어느 단계에서 실패해도 로컬 서버는 그대로 둔다.
+   */
+  private async startTunnel(port: number): Promise<void> {
+    try {
+      const binPath = await ensureCloudflared({
+        storageDir: this.deps.storageDir,
+        log: {
+          info: (message) => this.deps.log.info(message),
+          warn: (message) => this.deps.log.warn(message)
+        }
+      });
+
+      const config = readConfig();
+      const token = await this.deps.secrets.getTunnelToken();
+
+      const tunnel = new TunnelManager({
+        binPath,
+        localPort: port,
+        token,
+        hostname: config.tunnelHostname,
+        log: {
+          info: (message) => this.deps.log.info(message),
+          warn: (message) => this.deps.log.warn(message),
+          error: (message) => this.deps.log.error(message)
+        },
+        onStatus: (status, url, message) => {
+          if (status === 'connected') {
+            this.deps.store.update({ status: 'tunneled', tunnelUrl: url, message });
+            if (url !== undefined) {
+              this.deps.log.info(`터널 연결됨: ${url}${MCP_ENDPOINT}`);
+            }
+            return;
+          }
+          if (status === 'failed') {
+            // 서버 자체는 살아 있으므로 running으로 되돌린다.
+            this.deps.store.update({ status: 'running', tunnelUrl: undefined, message });
+            void vscode.window.showWarningMessage(
+              `GPT Bridge: 터널 연결에 실패했습니다 — ${message ?? '사유 불명'}. 로컬 엔드포인트는 계속 사용할 수 있습니다.`
+            );
+            return;
+          }
+          if (status === 'stopped' && this.http !== undefined) {
+            this.deps.store.update({ status: 'running', tunnelUrl: undefined });
+          }
+        }
+      });
+
+      this.tunnel = tunnel;
+      const url = await tunnel.start();
+
+      if (url !== undefined && token === undefined) {
+        // Quick Tunnel은 재시작마다 URL이 바뀐다. 사용자가 알아야 한다.
+        this.deps.log.warn(
+          'Quick Tunnel은 재시작할 때마다 URL이 바뀝니다. 실사용에는 Named Tunnel을 권장합니다.'
+        );
+      }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.deps.log.error(`터널 시작 실패: ${reason}`);
+      this.deps.store.update({ message: `터널 실패: ${reason}` });
+      void vscode.window.showWarningMessage(
+        `GPT Bridge: 터널을 시작하지 못했습니다 — ${reason}. 로컬 엔드포인트는 계속 사용할 수 있습니다.`
+      );
+    }
+  }
+
   async stop(): Promise<void> {
+    const tunnel = this.tunnel;
+    this.tunnel = undefined;
+    if (tunnel !== undefined) {
+      await tunnel.stop();
+    }
+
     const http = this.http;
     this.http = undefined;
     if (http !== undefined) {
