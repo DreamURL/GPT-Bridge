@@ -343,7 +343,66 @@ Windows에서 여는 것"이기 때문이다. → project.md §5.3.1 신설.
 
 ---
 
-## Phase 5 — 마감 (예정)
+## Phase 5 — 마감 ⚠️ 코드 완료, 패키징 검증 미완
 
-감사 로그 JSONL 영속화, 에러 처리 정리, `.vsix` 로컬 설치 검증.
-**패키징은 Windows에서 해야 한다**(rg.exe).
+### 완료 항목
+
+| 항목 | 파일 | 비고 |
+|---|---|---|
+| 감사 로그 | `src/audit/AuditLog.ts` | JSONL, 직렬 쓰기, 5MB 로테이션, vscode 비의존 |
+| 경로 마스킹 | `src/workspace/redact.ts` | 오류 메시지의 절대 경로를 `<workspace>`로 |
+| 감사 연동 | `src/mcp/McpServer.ts` | 툴 호출·차단·거부·만료·디스크쓰기·인증실패 |
+| 만료 선택 기록 | `src/extension.ts` | 게이트 훅 → `expired_choice` |
+| 종료 시 flush | `src/extension.ts` | `deactivate()`가 큐를 비울 때까지 대기 |
+
+승인 모드 3종과 자동 저장 옵션은 Phase 4에서 이미 완료되었다.
+
+### 기록하는 사건
+
+툴 호출만이 아니라 **아무 일도 일어나지 않은 사건**을 함께 남긴다. 사용자가
+나중에 "GPT가 뭘 시도했나"를 되짚을 수 있어야 하기 때문이다.
+
+`tool_call` · `path_denied` · `approval_denied` · `approval_expired` ·
+`expired_choice` · `disk_write` · `auth_failure` · `server`
+
+`detail`은 500자에서 자른다. 자르지 않으면 `write_file`의 인자 요약에 파일 내용이
+통째로 들어간다.
+
+### 에러 처리 정리
+
+- 예기치 못한 오류 메시지에서 워크스페이스 절대 경로를 걷어낸다. fs 오류에는
+  절대 경로가 섞여 있어 그대로 돌려주면 워크스페이스 밖 디렉터리 구조가 노출된다.
+- 감사 로그 쓰기 실패는 삼키고 `onError`로만 알린다. 로그 때문에 툴이 죽으면 안 된다.
+  실패해도 큐가 끊기지 않는지 테스트로 확인했다.
+
+### 테스트 — 142개 전부 통과 (Phase 5에서 11개 추가)
+
+| 파일 | 개수 | 범위 |
+|---|---|---|
+| `test/auditLog.test.ts` | 11 | JSONL 형식, 직렬성 200건, 사건 종류, 절삭, 실패 내성, 경로 마스킹 |
+
+### 구현 중 발견한 것
+
+**`redactRoot`를 `registry.ts`에 두었더니 테스트가 통째로 실패했다.** `registry.ts`는
+툴 모듈을 import하고 그 모듈들이 `vscode`를 끌어온다. 테스트 번들에서 `vscode`는
+external이라 로드 시점에 터진다. 순수 모듈(`workspace/redact.ts`)로 분리했다.
+
+→ 교훈: 테스트하려는 함수는 vscode를 import하는 모듈에 두지 말 것. Phase 2부터
+지켜 온 원칙인데 한 번 어겼다가 바로 드러났다.
+
+### 미해결
+
+- **`.vsix` 패키징 검증이 Linux 기준이다.** 이 환경에서 만든 `.vsix`에는
+  `ripgrep-linux-x64`가 들어간다. 대상 환경이 Windows이므로 **Windows에서 다시
+  패키징해 `rg.exe` 포함과 검색 동작을 확인해야 한다.** VERIFICATION.md E-8~E-12.
+- 로컬 설치(`code --install-extension`) 미검증.
+
+---
+
+## 직접 검증해야 하는 항목
+
+Phase 1~5에서 `vscode` API를 실제로 호출하는 경로는 이 환경에서 확인할 수 없었다.
+확인해야 할 항목을 [`VERIFICATION.md`](./VERIFICATION.md)에 정리했다.
+
+가장 중요한 것은 **D-1 ~ D-4** — 수정이 버퍼에만 적용되는지, Ctrl+Z로 되돌아가는지,
+거부 시 아무 일도 없는지, 만료 후 '적용'이 무시되는지. 이 확장의 존재 이유다.

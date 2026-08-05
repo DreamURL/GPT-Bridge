@@ -10,8 +10,12 @@ Ctrl+Z로 되돌릴 수 있고, Ctrl+S 전까지 디스크는 그대로입니다
 
 - 설계 문서: [`project.md`](./project.md)
 - 진행 상황: [`PROGRESS.md`](./PROGRESS.md)
+- **직접 확인할 항목: [`VERIFICATION.md`](./VERIFICATION.md)**
 
-현재 **Phase 1(확장 골격)** 까지 구현되어 있습니다. MCP 서버와 터널은 아직 동작하지 않습니다.
+Phase 1~5 코드가 모두 구현되어 있고 자동 테스트 142개가 통과합니다.
+다만 자동 테스트는 VS Code 확장 호스트가 없는 환경에서 돌았으므로,
+`vscode` API를 실제로 호출하는 경로(버퍼 편집·undo·모달·터널·패키징)는
+`VERIFICATION.md`를 따라 직접 확인해야 합니다.
 
 ## 개발
 

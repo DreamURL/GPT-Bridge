@@ -24,7 +24,9 @@ export function newRequestId(): string {
 export function createVscodeApprovalGate(
   log: vscode.LogOutputChannel,
   previews: Map<string, PendingPreview>,
-  diffPreview: DiffPreview
+  diffPreview: DiffPreview,
+  /** 만료 후 선택을 감사 로그에 남기기 위한 훅. */
+  onExpiredChoiceAudit: (request: ApprovalRequest, choice: PromptChoice) => void
 ): ApprovalGate {
   return new ApprovalGate({
     timeoutMs: () => readConfig().approvalTimeoutSeconds * 1000,
@@ -63,6 +65,7 @@ export function createVscodeApprovalGate(
       log.warn(
         `만료된 승인 요청에 대한 선택을 무시했습니다 (id=${request.id}, choice=${choice})`
       );
+      onExpiredChoiceAudit(request, choice);
       void vscode.window.showWarningMessage(
         `GPT Bridge: 승인 대기 시간이 지난 요청이라 "${request.relPath}" 수정을 적용하지 않았습니다. ` +
           `필요하면 GPT에게 다시 요청하세요.`

@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { PathError } from '../workspace/PathGuard';
+import { redactRoot } from '../workspace/redact';
 import {
   CREATE_DIRECTORY_DESCRIPTION,
   createDirectorySchema,
@@ -51,6 +52,7 @@ import { errorResult, type ToolContext, type ToolResult } from './tools/types';
 export const SERVER_NAME = 'gpt-bridge';
 export const SERVER_VERSION = '0.1.0';
 
+
 /**
  * 툴 핸들러 공통 처리.
  *
@@ -90,7 +92,9 @@ function guarded<A>(
       const reason = error instanceof Error ? error.message : String(error);
       ctx.log.error(`${toolName} 실패: ${reason}`);
       ctx.onActivity({ tool: toolName, detail, ok: false, durationMs });
-      return errorResult(`툴 실행에 실패했습니다: ${reason}`);
+      // 예기치 못한 오류(주로 fs 오류)의 메시지에는 절대 경로가 섞여 있다.
+      // 그대로 돌려주면 워크스페이스 밖의 디렉터리 구조가 모델에게 노출된다.
+      return errorResult(`툴 실행에 실패했습니다: ${redactRoot(reason, ctx.root)}`);
     }
   };
 }

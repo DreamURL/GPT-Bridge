@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { DiffPreview } from './approval/DiffPreview';
+import { AuditLog } from './audit/AuditLog';
 import { createVscodeApprovalGate, type PendingPreview } from './approval/vscodeGate';
 import { registerCommands } from './commands';
 import { onConfigChange, readConfig } from './config';
@@ -15,6 +16,7 @@ import { StatusBar } from './ui/statusBar';
  * context.subscriptions의 dispose()는 동기라 자식 프로세스 종료를 기다리지 못한다.
  */
 let activeServer: BridgeServer | undefined;
+let activeAudit: AuditLog | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
   // Disposable은 예외 없이 context.subscriptions에 등록한다 (project.md §0).
@@ -40,11 +42,26 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  // 감사 로그 (§5.6). LogOutputChannel과 동시에 JSONL로도 남긴다.
+  const audit = new AuditLog({
+    directory: vscode.Uri.joinPath(context.globalStorageUri, 'audit').fsPath,
+    onError: (message) => log.error(message)
+  });
+  log.info(`감사 로그: ${audit.path}`);
+
   // 승인 게이트. session 모드 승인은 확장 리로드 시 자연히 해제된다 —
   // 이 객체가 새로 만들어지기 때문이다 (project.md §5.4).
   const diffPreview = new DiffPreview();
   const previews = new Map<string, PendingPreview>();
-  const approvalGate = createVscodeApprovalGate(log, previews, diffPreview);
+  const approvalGate = createVscodeApprovalGate(log, previews, diffPreview, (request, choice) =>
+    audit.append({
+      kind: 'expired_choice',
+      tool: request.tool,
+      detail: request.relPath,
+      ok: false,
+      message: `만료 후 선택: ${choice}`
+    })
+  );
   context.subscriptions.push(diffPreview);
 
   const server = new BridgeServer({
@@ -52,6 +69,7 @@ export function activate(context: vscode.ExtensionContext): void {
     store,
     secrets,
     approvalGate,
+    audit,
     previews,
     extensionPath: context.extensionUri.fsPath,
     storageDir: context.globalStorageUri.fsPath,
@@ -63,6 +81,7 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   context.subscriptions.push(server);
   activeServer = server;
+  activeAudit = audit;
 
   statusBar.update(store.current);
   registerCommands(context, {
@@ -110,8 +129,15 @@ export function activate(context: vscode.ExtensionContext): void {
  */
 export async function deactivate(): Promise<void> {
   const server = activeServer;
+  const audit = activeAudit;
   activeServer = undefined;
+  activeAudit = undefined;
   if (server !== undefined) {
     await server.stop();
+  }
+  // 큐에 남은 기록이 디스크에 닿을 때까지 기다린다.
+  if (audit !== undefined) {
+    audit.append({ kind: 'server', detail: 'deactivated', ok: true });
+    await audit.flush();
   }
 }

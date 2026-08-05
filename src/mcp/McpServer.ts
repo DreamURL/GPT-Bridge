@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { ApprovalGate } from '../approval/ApprovalGate';
+import type { AuditLog } from '../audit/AuditLog';
 import type { PendingPreview } from '../approval/vscodeGate';
 import { readConfig, type BridgeConfig } from '../config';
 import type { SecretStore } from '../secrets';
@@ -21,6 +22,7 @@ export interface BridgeServerDeps {
   readonly storageDir: string;
   readonly onActivity: (entry: ActivityEntry) => void;
   readonly approvalGate: ApprovalGate;
+  readonly audit: AuditLog;
   /** 'Diff 보기'용 내용 보관소. 요청 id로 키를 잡는다. */
   readonly previews: Map<string, PendingPreview>;
 }
@@ -91,15 +93,57 @@ export class BridgeServer implements vscode.Disposable {
         onBlocked: (tool, reason, requestedPath) => {
           // 차단된 접근 시도는 조용히 실패시키지 않는다 (project.md §5.5).
           this.deps.log.warn(`차단됨 — ${tool}(${requestedPath}): ${reason}`);
+          this.deps.audit.append({
+            kind: 'path_denied',
+            tool,
+            detail: requestedPath,
+            ok: false,
+            message: reason
+          });
           void vscode.window.showWarningMessage(
             `GPT Bridge: 차단된 접근 시도 — ${tool} "${requestedPath}" (${reason})`
           );
         },
-        onActivity: this.deps.onActivity,
+        onActivity: (entry) => {
+          this.deps.audit.append({
+            kind: 'tool_call',
+            tool: entry.tool,
+            detail: entry.detail,
+            ok: entry.ok,
+            durationMs: entry.durationMs
+          });
+          this.deps.onActivity(entry);
+        },
         approve: async (request, preview) => {
           this.deps.previews.set(request.id, preview);
           try {
-            return await this.deps.approvalGate.request(request);
+            const decision = await this.deps.approvalGate.request(request);
+
+            if (decision === 'denied') {
+              this.deps.audit.append({
+                kind: 'approval_denied',
+                tool: request.tool,
+                detail: request.relPath,
+                ok: false
+              });
+            } else if (decision === 'expired') {
+              this.deps.audit.append({
+                kind: 'approval_expired',
+                tool: request.tool,
+                detail: request.relPath,
+                ok: false
+              });
+            } else if (request.diskImmediate) {
+              // 디스크에 즉시 반영되는 작업은 별도로 남긴다 (§4.2.1).
+              this.deps.audit.append({
+                kind: 'disk_write',
+                tool: request.tool,
+                detail: request.relPath,
+                ok: true
+              });
+            }
+
+            return decision;
           } finally {
             // 만료된 요청의 모달이 아직 떠 있을 수 있으므로 바로 지우지 않는다.
             // 그때 'Diff 보기'를 눌러도 게이트가 선택을 버리지만, 미리보기가
@@ -122,12 +166,19 @@ export class BridgeServer implements vscode.Disposable {
         },
         onAuthFailure: (reason, remoteAddress) => {
           this.deps.log.warn(`인증 실패 (${reason}) — ${remoteAddress ?? '주소 불명'}`);
+          this.deps.audit.append({
+            kind: 'auth_failure',
+            detail: remoteAddress ?? '주소 불명',
+            ok: false,
+            message: reason
+          });
         }
       });
 
       const port = await http.start();
       this.http = http;
       this.deps.store.update({ status: 'running', port, message: undefined });
+      this.deps.audit.append({ kind: 'server', detail: `started port=${port}`, ok: true });
       this.deps.log.info(`로컬 엔드포인트: http://127.0.0.1:${port}${MCP_ENDPOINT}`);
 
       if (config.tunnelProvider === 'cloudflare') {
