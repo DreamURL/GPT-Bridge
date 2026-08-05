@@ -1,5 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type * as vscode from 'vscode';
+import type { ApprovalDecision, ApprovalRequest } from '../../approval/ApprovalGate';
+import type { PendingPreview } from '../../approval/vscodeGate';
 import type { BridgeConfig } from '../../config';
 import type { PathGuard } from '../../workspace/PathGuard';
 import type { Ripgrep } from '../../workspace/ripgrep';
@@ -24,6 +26,14 @@ export interface ToolContext {
   /** 차단된 접근 시도. 조용히 실패시키지 않고 사용자에게 알린다 (§5.5). */
   readonly onBlocked: (tool: string, reason: string, requestedPath: string) => void;
   readonly onActivity: (entry: ActivityEntry) => void;
+  /**
+   * 쓰기 작업 승인 (§5.4). 직렬 큐를 거치므로 모달이 겹치지 않는다.
+   * preview는 'Diff 보기'를 눌렀을 때 보여 줄 내용이다.
+   */
+  readonly approve: (
+    request: ApprovalRequest,
+    preview: PendingPreview
+  ) => Promise<ApprovalDecision>;
 }
 
 /**

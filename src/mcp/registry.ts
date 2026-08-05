@@ -1,6 +1,32 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { PathError } from '../workspace/PathGuard';
 import {
+  CREATE_DIRECTORY_DESCRIPTION,
+  createDirectorySchema,
+  createDirectoryTool,
+  DELETE_PATH_DESCRIPTION,
+  deletePathSchema,
+  deletePathTool,
+  SAVE_FILE_DESCRIPTION,
+  saveFileSchema,
+  saveFileTool,
+  type CreateDirectoryArgs,
+  type DeletePathArgs,
+  type SaveFileArgs
+} from './tools/fileOps';
+import {
+  EDIT_FILE_DESCRIPTION,
+  editFileSchema,
+  editFileTool,
+  type EditFileArgs
+} from './tools/editFile';
+import {
+  WRITE_FILE_DESCRIPTION,
+  writeFileSchema,
+  writeFileTool,
+  type WriteFileArgs
+} from './tools/writeFile';
+import {
   GET_DIAGNOSTICS_DESCRIPTION,
   getDiagnosticsSchema,
   getDiagnosticsTool,
@@ -161,6 +187,90 @@ export function createConfiguredServer(ctx: ToolContext): McpServer {
       'get_diagnostics',
       (args: GetDiagnosticsArgs) => args.path ?? '전체',
       async (args: GetDiagnosticsArgs) => getDiagnosticsTool(ctx, args)
+    )
+  );
+
+  // ── 쓰기 계열 — 전부 승인 게이트를 거친다 (§5.4) ──────────────────
+  // destructiveHint / readOnlyHint는 클라이언트가 사용자에게 위험도를
+  // 표시하는 데 쓴다. 실제 차단은 우리 쪽 승인 게이트가 한다.
+
+  server.registerTool(
+    'edit_file',
+    {
+      title: '파일 수정',
+      description: EDIT_FILE_DESCRIPTION,
+      inputSchema: editFileSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }
+    },
+    guarded(
+      ctx,
+      'edit_file',
+      (args: EditFileArgs) => args.path,
+      async (args: EditFileArgs) => editFileTool(ctx, args)
+    )
+  );
+
+  server.registerTool(
+    'write_file',
+    {
+      title: '파일 생성 / 전체 교체',
+      description: WRITE_FILE_DESCRIPTION,
+      inputSchema: writeFileSchema,
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false }
+    },
+    guarded(
+      ctx,
+      'write_file',
+      (args: WriteFileArgs) => args.path,
+      async (args: WriteFileArgs) => writeFileTool(ctx, args)
+    )
+  );
+
+  server.registerTool(
+    'create_directory',
+    {
+      title: '디렉터리 생성',
+      description: CREATE_DIRECTORY_DESCRIPTION,
+      inputSchema: createDirectorySchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }
+    },
+    guarded(
+      ctx,
+      'create_directory',
+      (args: CreateDirectoryArgs) => args.path,
+      async (args: CreateDirectoryArgs) => createDirectoryTool(ctx, args)
+    )
+  );
+
+  server.registerTool(
+    'delete_path',
+    {
+      title: '삭제',
+      description: DELETE_PATH_DESCRIPTION,
+      inputSchema: deletePathSchema,
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false }
+    },
+    guarded(
+      ctx,
+      'delete_path',
+      (args: DeletePathArgs) => args.path,
+      async (args: DeletePathArgs) => deletePathTool(ctx, args)
+    )
+  );
+
+  server.registerTool(
+    'save_file',
+    {
+      title: '저장',
+      description: SAVE_FILE_DESCRIPTION,
+      inputSchema: saveFileSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }
+    },
+    guarded(
+      ctx,
+      'save_file',
+      (args: SaveFileArgs) => args.path,
+      async (args: SaveFileArgs) => saveFileTool(ctx, args)
     )
   );
 

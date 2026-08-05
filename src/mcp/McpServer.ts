@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import type { ApprovalGate } from '../approval/ApprovalGate';
+import type { PendingPreview } from '../approval/vscodeGate';
 import { readConfig, type BridgeConfig } from '../config';
 import type { SecretStore } from '../secrets';
 import type { BridgeStateStore } from '../state';
@@ -18,6 +20,9 @@ export interface BridgeServerDeps {
   /** cloudflared 바이너리를 두는 곳 (context.globalStorageUri). */
   readonly storageDir: string;
   readonly onActivity: (entry: ActivityEntry) => void;
+  readonly approvalGate: ApprovalGate;
+  /** 'Diff 보기'용 내용 보관소. 요청 id로 키를 잡는다. */
+  readonly previews: Map<string, PendingPreview>;
 }
 
 /**
@@ -90,7 +95,18 @@ export class BridgeServer implements vscode.Disposable {
             `GPT Bridge: 차단된 접근 시도 — ${tool} "${requestedPath}" (${reason})`
           );
         },
-        onActivity: this.deps.onActivity
+        onActivity: this.deps.onActivity,
+        approve: async (request, preview) => {
+          this.deps.previews.set(request.id, preview);
+          try {
+            return await this.deps.approvalGate.request(request);
+          } finally {
+            // 만료된 요청의 모달이 아직 떠 있을 수 있으므로 바로 지우지 않는다.
+            // 그때 'Diff 보기'를 눌러도 게이트가 선택을 버리지만, 미리보기가
+            // 비어 있으면 사용자에게 혼란스러운 빈 창이 뜬다.
+            setTimeout(() => this.deps.previews.delete(request.id), 5 * 60_000);
+          }
+        }
       };
 
       this.token = await this.deps.secrets.ensureAuthToken();
@@ -214,6 +230,10 @@ export class BridgeServer implements vscode.Disposable {
   }
 
   async stop(): Promise<void> {
+    // 세션 자동 승인은 서버를 내리면 해제한다. 기획안은 확장 리로드 시
+    // 해제를 요구하지만, 서버를 껐다 켠 것도 새 세션으로 보는 편이 안전하다.
+    this.deps.approvalGate.resetSession();
+
     const tunnel = this.tunnel;
     this.tunnel = undefined;
     if (tunnel !== undefined) {

@@ -281,8 +281,69 @@ Windows에서 여는 것"이기 때문이다. → project.md §5.3.1 신설.
 
 ---
 
-## Phase 4 — 쓰기 + 승인 (예정)
+## Phase 4 — 쓰기 + 승인 ⚠️ 코드 완료, 실측 미완
 
-`edit_file` / `write_file` / `create_directory` / `delete_path`,
-ApprovalGate 직렬 큐 + nonce 만료(§5.4.1), DiffPreview.
-첫 작업은 위의 CRLF 정규화.
+### 완료 항목
+
+| 항목 | 파일 | 비고 |
+|---|---|---|
+| 문자열 매칭 | `src/workspace/textEdit.ts` | CRLF 대응, 고유성 판정, 변경 규모 요약 |
+| 승인 게이트 | `src/approval/ApprovalGate.ts` | 직렬 큐 + nonce 만료. vscode 비의존 |
+| VS Code 어댑터 | `src/approval/vscodeGate.ts` | 모달 문구, 만료 알림 |
+| Diff 미리보기 | `src/approval/DiffPreview.ts` | `gpt-bridge-preview:` 스킴 + `vscode.diff` |
+| `edit_file` | `src/mcp/tools/editFile.ts` | 주력 툴. 버퍼 편집 |
+| `write_file` | `src/mcp/tools/writeFile.ts` | 기존=버퍼 교체, 신규=디스크 즉시 |
+| 나머지 3종 | `src/mcp/tools/fileOps.ts` | `create_directory` / `delete_path` / `save_file` |
+
+### CRLF 처리 — Windows에서 가장 중요한 부분
+
+`TextDocument.getText()`는 문서의 EOL을 그대로 돌려주고, GPT는 `\n`으로 보낸다.
+두 가지 방향이 있었다.
+
+- (a) 문서를 LF로 정규화해 찾고, 찾은 위치를 원본 오프셋으로 역매핑
+- (b) **찾을 문자열을 문서의 EOL에 맞춰 바꾼 뒤 그대로 찾기** ← 채택
+
+(b)는 오프셋 역매핑이 없어 경계 조건에서 틀릴 여지가 없고, 치환 문자열도 같은 EOL로
+맞추면 파일의 줄바꿈 스타일이 보존된다. 줄바꿈이 섞인 파일을 위해 다른 EOL 후보로도
+한 번 더 시도한다. CRLF 파일에서 LF로 보낸 여러 줄 문자열이 매칭되는지, 치환 후
+줄바꿈이 깨지지 않는지 테스트로 확인했다.
+
+### 테스트 — 131개 전부 통과 (Phase 4에서 45개 추가)
+
+| 파일 | 개수 | 범위 |
+|---|---|---|
+| `test/textEdit.test.ts` | 22 | EOL 정규화, 0회·2회 매치, CRLF 매칭 7종, 변경 요약 |
+| `test/approvalGate.test.ts` | 23 | 기본 흐름 5, 직렬 큐 3, 만료 4, 승인 모드 6, delete 4 |
+
+직렬 큐 테스트는 동시 요청 중 프롬프트가 **동시에 두 개 이상 뜨지 않는지**를
+카운터로 확인한다. 만료 테스트는 타임아웃 후 사용자가 '적용'을 눌러도 승인되지 않고
+별도 알림이 나가는지를 확인한다 — §5.4.1의 핵심이다.
+
+### 설계 판단 기록
+
+- **`doc.version` 대조 대신 재검색을 쓴다.** 기획안 §5.4.1은 승인 시점의 문서 버전과
+  대조하라고 하지만, 그러면 사용자가 파일의 **다른 부분**을 건드리기만 해도 편집이
+  거부된다. 대신 승인 직후 `old_string`을 다시 찾아 여전히 고유한지 확인한다.
+  대상 문자열이 사라졌거나 중복이 생겼으면 거부하고, 오프셋이 밀렸으면 새 위치를 쓴다.
+  버전 대조보다 정확하고 오탐이 없다.
+- **서버 중지 시 세션 승인을 해제한다.** 기획안은 확장 리로드 시 해제를 요구하지만,
+  서버를 껐다 켠 것도 새 세션으로 보는 편이 안전하다.
+- **삭제는 휴지통을 우선한다.** `workspace.fs.delete({useTrash: true})`를 먼저 쓰고,
+  실패하는 환경에서만 영구 삭제하며 그 사실을 응답에 명시한다.
+- **`save_file` description에 "기본적으로 부르지 말 것"을 넣었다.** 저장하지 않는 것이
+  이 확장의 안전장치이므로 모델이 습관적으로 저장하면 안 된다.
+
+### 미해결 / 다음 Phase로 넘김
+
+- **vscode API 경로 실측 미완.** 검증한 것은 매칭 로직과 승인 게이트다.
+  `applyEdit`이 실제로 버퍼에만 적용되는지, Ctrl+Z로 되돌아가는지, 승인 거부 시
+  버퍼가 그대로인지는 F5 확인이 필요하다. Phase 4 완료 기준의 핵심이라 반드시 확인할 것.
+- **`createFile`의 상위 디렉터리 자동 생성**을 문서로만 확인했다. 실측 필요.
+- 감사 로그 영속화(§5.6)는 Phase 5 항목이다. 현재는 LogOutputChannel과 패널에만 남는다.
+
+---
+
+## Phase 5 — 마감 (예정)
+
+감사 로그 JSONL 영속화, 에러 처리 정리, `.vsix` 로컬 설치 검증.
+**패키징은 Windows에서 해야 한다**(rg.exe).

@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import { DiffPreview } from './approval/DiffPreview';
+import { createVscodeApprovalGate, type PendingPreview } from './approval/vscodeGate';
 import { registerCommands } from './commands';
 import { onConfigChange, readConfig } from './config';
 import { BridgeServer } from './mcp/McpServer';
@@ -38,10 +40,19 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  // 승인 게이트. session 모드 승인은 확장 리로드 시 자연히 해제된다 —
+  // 이 객체가 새로 만들어지기 때문이다 (project.md §5.4).
+  const diffPreview = new DiffPreview();
+  const previews = new Map<string, PendingPreview>();
+  const approvalGate = createVscodeApprovalGate(log, previews, diffPreview);
+  context.subscriptions.push(diffPreview);
+
   const server = new BridgeServer({
     log,
     store,
     secrets,
+    approvalGate,
+    previews,
     extensionPath: context.extensionUri.fsPath,
     storageDir: context.globalStorageUri.fsPath,
     onActivity: (entry) => {
