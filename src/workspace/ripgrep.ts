@@ -155,6 +155,13 @@ export interface SearchOptions {
   readonly isRegex: boolean;
   readonly include: string | undefined;
   readonly maxResults: number;
+  /**
+   * 매치 줄 앞뒤로 함께 반환할 줄 수. 0이면 매치 줄만.
+   *
+   * 위치만 확인할 때는 0이 훨씬 싸다. 매치 50건에 앞뒤 2줄이면 250줄이
+   * 모델의 컨텍스트로 들어가는데, 그중 200줄은 대개 쓰이지 않는다.
+   */
+  readonly contextLines: number;
 }
 
 export interface SearchOutcome {
@@ -219,10 +226,13 @@ export class Ripgrep {
 
   /** 텍스트 검색. 매치 줄과 앞뒤 2줄 컨텍스트를 반환한다. */
   async search(root: string, options: SearchOptions): Promise<SearchOutcome> {
+    // 음수나 소수가 넘어오면 rg가 인자 오류로 죽는다. 여기서 정수로 고정한다.
+    const context = Math.max(0, Math.floor(options.contextLines));
+
     const args = [
       '--json',
       '--context',
-      '2',
+      String(context),
       '--hidden',
       '--no-messages',
       '--max-columns',

@@ -1,4 +1,4 @@
-# GPT Bridge — VS Code 확장 개발 기획안 (rev. 2)
+# GPT Bridge — VS Code 확장 개발 기획안 (rev. 3)
 
 현재 워크스페이스를 MCP 서버로 노출하여 ChatGPT 웹(Developer Mode 커스텀 커넥터)이 코드를 직접 읽고 수정할 수 있게 하는 VS Code 확장.
 
@@ -8,6 +8,16 @@
 
 개인 사용 목적. 마켓플레이스 배포 없이 `.vsix` 로컬 설치.
 
+> rev. 3 변경 요약 — Windows 실측(2026-08-05)과 실사용 검토를 반영했다.
+> 1. **컨텍스트 절약 §4.5 신설.** 모델이 수정할 때마다 같은 파일을 다시 통째로
+>    읽는 것이 실질적 한계로 지목됐다. 반복 읽기 감지 + `context_lines` +
+>    지침·description 보강. **하드 상한은 두지 않는다** — 막지 않고 알린다.
+> 2. §5.4 모달 버튼 정정. 구현은 `적용`/`Diff 보기`만 넘기고 VS Code가 `취소`를
+>    붙인다. Esc·취소·강제 종료가 모두 거부로 수렴하는 편이 안전하다.
+> 3. §10에 제약 2개 추가 — git 저장소가 아니면 `.gitignore`가 반영되지 않는다(14),
+>    MCP Inspector의 Bearer Token 칸이 프록시를 거치며 유실된다(15).
+> 4. §11에 Phase 6 테스트 항목 추가.
+>
 > rev. 2 변경 요약 — 초안 검토에서 확인된 5개 사항을 반영했다.
 > 1. `workspace.findFiles`는 `.gitignore`를 반영하지 않는다 → 목록·검색 모두 ripgrep으로 통일 (§4.1)
 > 2. 파일 생성/삭제는 버퍼가 아니라 디스크에 즉시 적용된다 → 안전성 서술 정정, 승인 규칙 강화 (§4.2.1)
@@ -23,7 +33,13 @@
 - **§5 보안 코드는 타협 불가.** 이 확장은 로컬 파일시스템을 공개 HTTPS 엔드포인트로 노출한다. "일단 동작하게" 우회 금지.
 - TypeScript `strict: true`, `any` 금지.
 - 모든 `Disposable`은 `context.subscriptions`에 등록한다. 확장 호스트는 리로드가 잦아 정리 누락 시 포트·프로세스가 누수된다.
+- **테스트할 함수는 `vscode`를 import하는 모듈에 두지 않는다.** 테스트 번들에서
+  `vscode`는 external이라 로드 시점에 터진다. 판정·매칭·상태 관리처럼 검증이
+  필요한 로직은 순수 모듈로 분리한다(`PathGuard`, `textEdit`, `ApprovalGate`,
+  `AuditLog`, `readTracker`가 그렇게 되어 있다). Phase 5에서 한 번 어겼다가
+  테스트가 통째로 깨졌다.
 - Phase 완료 시 `PROGRESS.md`에 완료 항목과 미해결 이슈 기록.
+- 코드를 고쳤으면 `VERIFICATION.md`의 해당 항목, 특히 **D-1~D-4를 다시 확인**한다.
 
 ---
 
@@ -85,8 +101,12 @@ gpt-bridge/
 │  ├─ workspace/
 │  │  ├─ PathGuard.ts           ★ 경로 검증
 │  │  ├─ denyList.ts
+│  │  ├─ glob.ts                * ** ? 만 지원하는 경량 매처
 │  │  ├─ ripgrep.ts             ★ rg 실행 래퍼 (목록 + 검색)
-│  │  └─ documents.ts           openTextDocument / applyEdit 래퍼
+│  │  ├─ documents.ts           openTextDocument / applyEdit 래퍼
+│  │  ├─ textEdit.ts            CRLF 대응 문자열 매칭 (§4.2)
+│  │  ├─ readTracker.ts         읽기 이력 → 반복 읽기 감지 (§4.5)
+│  │  └─ redact.ts              오류 메시지의 절대 경로 마스킹
 │  ├─ approval/
 │  │  ├─ ApprovalGate.ts        직렬 큐 + nonce 만료 처리
 │  │  └─ DiffPreview.ts         TextDocumentContentProvider
@@ -246,8 +266,9 @@ end_line?: number
 ```
 query: string
 is_regex?: boolean
-include?: string       glob
-max_results?: number   기본 50
+include?: string        glob
+max_results?: number    기본 50
+context_lines?: number  0~5, 기본 2 (Phase 6에서 추가)
 ```
 
 `workspace.findTextInFiles`는 **proposed API라 일반 확장에서 사용할 수 없다.** `@vscode/ripgrep`의 `rgPath`로 rg 바이너리를 직접 실행할 것. 매치 줄 + 앞뒤 2줄 컨텍스트 반환.
@@ -257,6 +278,10 @@ max_results?: number   기본 50
 - `-e <query>`로 패턴을 명시해 `-`로 시작하는 질의가 옵션으로 해석되는 것을 막는다.
 - `is_regex`가 false면 `--fixed-strings`.
 - 타임아웃 10초, 초과 시 프로세스 kill 후 부분 결과와 함께 잘렸음을 알린다.
+- `context_lines`는 `--context`에 그대로 넘긴다. 음수·소수가 오면 rg가 인자 오류로
+  죽으므로 `Math.max(0, Math.floor(n))`으로 보정한다. **위치만 필요할 때 0을 쓰면
+  응답이 크게 줄어든다** — 매치 50건에 앞뒤 2줄이면 250줄이 모델 컨텍스트로
+  들어가는데 그중 200줄은 대개 쓰이지 않는다(§4.5).
 
 **`get_diagnostics`**
 
@@ -342,6 +367,9 @@ ChatGPT는 명시적 지시 없이는 커스텀 툴을 잘 호출하지 않는�
 
 `gptBridge.copyInstructions` 명령과 Webview 패널의 복사 버튼으로 제공한다.
 
+지침 원문은 `src/instructions.ts`가 단일 출처다. 1~5는 동작 순서, 6~11은 컨텍스트
+절약이며 후자는 Phase 6에서 추가했다(§4.5).
+
 ```
 코드 작업 시 GPT Bridge 커넥터의 툴만 사용한다.
 내장 브라우징, 코드 인터프리터, 캔버스는 사용하지 않는다.
@@ -350,9 +378,67 @@ ChatGPT는 명시적 지시 없이는 커스텀 툴을 잘 호출하지 않는�
 1. 첫 턴에 get_workspace_info를 호출한다.
 2. 수정 전 반드시 read_file로 현재 내용을 확인한다.
 3. 기존 파일 수정은 edit_file을 사용한다. write_file은 신규 생성 전용이다.
+   기존 파일에 write_file을 쓰면 파일 전체를 다시 보내야 해서 낭비가 크고,
+   관계없는 부분까지 날아간다.
 4. 수정 후 get_diagnostics를 호출해 새 에러가 없는지 확인한다.
 5. 코드를 채팅창에 출력하지 말고 파일에 직접 반영한다.
+
+읽기 최소화 — 대화가 길어져도 앞을 잊지 않으려면 필요하다:
+6. 파일을 처음 볼 때는 전체를 읽어도 된다. 구조 파악에 필요하다.
+   그러나 한 번 읽은 파일을 수정할 때 다시 전체를 읽지 않는다.
+7. 어디를 고쳐야 할지 모르면 read_file 대신 search_text로 위치를 먼저 찾는다.
+   위치만 필요하면 context_lines를 0으로 준다.
+8. 다시 확인이 필요하면 search_text가 알려 준 줄 번호를 기준으로
+   start_line / end_line을 지정해 그 주변만 읽는다. 예: 120행이면 100~140.
+9. list_directory는 depth 1로 시작하고, 실제로 필요한 하위만 다시 조회한다.
+10. edit_file의 old_string은 고유해지는 최소 길이로 만든다.
+    함수 전체나 파일 전체를 붙여 넣지 않는다. 보통 2~5줄이면 충분하다.
+11. 같은 내용을 채팅에 다시 옮겨 적지 않는다. 요약과 다음 행동만 말한다.
 ```
+
+### 4.5 컨텍스트 절약 (Phase 6에서 추가)
+
+실사용에서 드러난 문제다. 모델은 근거를 확보하려는 성향이 있어 **수정할 때마다
+같은 파일을 처음부터 다시 읽는다.** 같은 내용이 대화에 몇 번씩 쌓이면 컨텍스트가
+차고, 정작 필요할 때 앞부분을 잃는다. 확장 하나를 개발하는 규모에서는 이게
+실질적인 한계로 작동한다.
+
+**하드 상한은 두지 않는다.** 파일 전체를 읽어야 하는 상황은 실제로 있다 — 처음
+구조를 파악할 때가 그렇다. 줄 수로 무조건 잘라내면 정당한 읽기까지 막힌다.
+막는 대신 **판단 근거를 준다.**
+
+세 갈래로 대응한다.
+
+1. **반복 읽기 감지** (`workspace/readTracker.ts`)
+
+   세션 동안 파일별로 "전체를 읽었는가"와 내용 지문(SHA-1 앞 16자)을 기억한다.
+   전체를 다시 읽었는데 지문이 같으면 응답에 이렇게 덧붙인다:
+
+   > 이 파일은 이번 세션에서 이미 전체를 읽었고 그 뒤로 내용이 바뀌지 않았습니다.
+   > 앞서 받은 내용을 그대로 쓰면 됩니다. …
+
+   내용은 **그대로 돌려준다.** 차단이 아니라 조언이다.
+
+   - 지문이 다르면 `repeat-changed` — 다시 읽는 게 맞으므로 그 사실만 알린다.
+   - 범위 지정 읽기(`ranged`)에는 참견하지 않는다. 유도하려는 형태이기 때문이다.
+   - 서버를 껐다 켜면 초기화된다. 세션 승인(§5.4)과 같은 경계를 쓴다.
+
+2. **큰 파일 전체 읽기 안내** (`tools/readFile.ts`)
+
+   400줄을 넘는 파일을 범위 없이 읽으면, 구조 파악에는 충분하니 이후 수정
+   단계에서는 `search_text` → 범위 읽기로 가라고 안내한다. 역시 내용은 다 준다.
+
+3. **`search_text`의 `context_lines`** (§4.1)
+
+   앞뒤 2줄 고정이던 것을 0~5로 열었다. 위치만 확인할 때 0을 쓰면 응답이
+   매치 줄만 남는다.
+
+툴 description(§4.3)에도 같은 원칙을 넣었다. 사용자 지침(§4.4)은 모델이 무시할 수
+있지만 description은 툴 목록과 함께 매번 전달되므로 더 확실하다.
+
+**추적 상태는 확장 프로세스 메모리에만 둔다.** 디스크에 남기지 않는다 — 어떤
+파일을 읽었는지 자체가 정보이고, 영속화하면 감사 로그와 별개의 기록이 하나 더
+생긴다.
 
 ---
 
@@ -442,11 +528,23 @@ rg에 넘기는 경로도 예외 없이 `PathGuard.resolve()`를 거친 결과�
 
 ```ts
 const choice = await vscode.window.showInformationMessage(
-  `GPT가 ${relPath} 수정을 요청했습니다 (+${added} -${removed})`,
-  { modal: true },
-  '적용', 'Diff 보기', '거부'
+  `GPT가 ${relPath} 수정을 요청했습니다 (+${added} -${removed}).`,
+  { modal: true, detail: '에디터 버퍼에만 적용됩니다. …' },
+  '적용', 'Diff 보기'
 );
+// 모달의 '취소'와 Esc는 모두 undefined로 온다. 거부로 취급한다.
 ```
+
+> **초안 정정 (Phase 4 구현, Phase 6에서 문서 반영).** 버튼으로 `'거부'`를 따로
+> 넘기지 않는다. VS Code 모달은 `취소`를 자동으로 붙이므로, `거부`까지 두면 같은
+> 뜻의 버튼이 둘이 되어 사용자가 차이를 추측하게 된다. 더 중요한 건 **Esc·취소·
+> 창 강제 종료가 전부 `undefined`로 수렴한다**는 점이다. 이걸 거부로 떨어뜨리면
+> 어떤 경로로 빠져나가도 항상 안전한 쪽이 된다. 실제 버튼은 `적용` / `Diff 보기` /
+> `취소` 셋이다.
+>
+> `detail`은 작업 종류에 따라 달라진다(§4.2.1). 텍스트 편집은 "에디터 버퍼에만
+> 적용됩니다", 생성은 "승인 즉시 디스크에 반영됩니다", 삭제는 여기에 "(가능하면
+> 휴지통으로 이동)"이 붙는다.
 
 파일 생성·삭제는 문구를 달리한다(§4.2.1):
 
@@ -600,6 +698,18 @@ TunnelManager, 바이너리 다운로드/검증(§6.1 핀 고정 + 해시 테이
 
 *완료 기준: `.vsix` 설치본에서 `search_text`·`list_directory`가 동작(§2.1 rg 바이너리 포함 확인). 확장 리로드 후 cloudflared 프로세스 잔존 없음.*
 
+### Phase 6 — 컨텍스트 절약 (rev.3에서 추가)
+
+§4.5. `workspace/readTracker.ts` 신설, `read_file` 안내, `search_text`의
+`context_lines`, 툴 description·사용자 지침 보강.
+
+실사용 규모(확장 하나를 개발하는 정도)에서 컨텍스트가 먼저 소진된다는 판단에서
+나왔다. Phase 1~5가 "안전한가"였다면 이건 "쓸 만한가"에 속한다.
+
+*완료 기준: 같은 파일을 연속으로 전체 읽었을 때 안내가 나오고, 범위 읽기에는
+나오지 않는다. `context_lines: 0`이 매치 줄만 반환한다. ChatGPT 연동 후 감사
+로그에서 같은 파일의 반복 전체 읽기가 줄어드는 것이 관찰된다.*
+
 ---
 
 ## 9. 범위 밖
@@ -627,6 +737,8 @@ TunnelManager, 바이너리 다운로드/검증(§6.1 핀 고정 + 해시 테이
 11. Windows arm64에서는 터널을 쓸 수 없다(cloudflared가 해당 자산을 배포하지 않는다). 로컬 엔드포인트는 정상 동작한다.
 12. 모든 경로 인자는 **`/`를 구분자로** 써야 한다. 역슬래시는 Windows에서도 거부된다 — POSIX에서는 파일명의 일부라 `..\..\etc\passwd`가 워크스페이스 안쪽 파일명으로 통과해 버리기 때문이다. VS Code API는 Windows에서도 `/`를 받는다.
 13. Windows에서 파일 심볼릭 링크를 만들려면 관리자 권한이나 개발자 모드가 필요하다. 테스트 스위트는 만들지 못하면 해당 케이스를 건너뛴다(조용히 통과시키지 않는다).
+14. **워크스페이스가 git 저장소가 아니면 `.gitignore`가 반영되지 않는다.** rg는 `--no-require-git`을 주지 않는 한 저장소 안에서만 `.gitignore`를 적용한다. 우리는 그 옵션을 주지 않으므로, git으로 관리하지 않는 폴더에서는 `list_directory`·`search_text`에 무시 대상 파일이 나타난다. 거부 목록(§5.3)은 그와 무관하게 항상 적용된다.
+15. MCP Inspector로 검증할 때 `Bearer Token` 입력칸은 프록시를 거치며 헤더가 유실된다. `Custom Headers`에 `Authorization: Bearer <토큰>`을 직접 넣어야 한다. 401이 나면 Inspector가 OAuth 등록(`POST /register`)을 시도해 엉뚱한 오류로 보인다. 감사 로그의 `auth_failure` message가 `missing`인지 `mismatch`인지로 구분한다.
 
 ---
 
@@ -664,3 +776,13 @@ rev. 2 추가 항목:
 - 승인 대기 중 사용자가 파일을 수정하면 `old_string` 재검증 실패로 편집이 거부됨 (변경 3)
 - rg 바이너리 부재 시 `list_directory`·`search_text`가 등록되지 않고 사용자에게 알림 (변경 4)
 - cloudflared 해시 불일치 시 파일 삭제 + 터널 시작 중단, 재시도 없음 (변경 5)
+
+rev. 3 추가 항목 (Phase 6, §4.5):
+
+- 같은 파일을 내용 변경 없이 두 번 전체 읽으면 `repeat-unchanged`로 판정된다
+- 내용이 바뀐 뒤 다시 읽으면 `repeat-changed` — 재읽기를 방해하지 않는다
+- **범위 지정 읽기에는 안내가 붙지 않는다** (유도하려는 형태에 잔소리하면 잡음이 된다)
+- 전체를 읽은 적 없는 파일을 처음 전체로 읽으면 조용하다
+- `reset()` 후에는 이력이 사라져 `first`로 판정된다
+- `context_lines: 0`이면 매치 줄만, 1이면 3줄, 2면 5줄이 반환된다
+- 음수·소수 `context_lines`가 0 이상 정수로 보정되어 rg가 인자 오류로 죽지 않는다

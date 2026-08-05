@@ -12,10 +12,12 @@ Ctrl+Z로 되돌릴 수 있고, Ctrl+S 전까지 디스크는 그대로입니다
 - 진행 상황: [`PROGRESS.md`](./PROGRESS.md)
 - **직접 확인할 항목: [`VERIFICATION.md`](./VERIFICATION.md)**
 
-Phase 1~5 코드가 모두 구현되어 있고 자동 테스트 142개가 통과합니다.
-다만 자동 테스트는 VS Code 확장 호스트가 없는 환경에서 돌았으므로,
-`vscode` API를 실제로 호출하는 경로(버퍼 편집·undo·모달·터널·패키징)는
-`VERIFICATION.md`를 따라 직접 확인해야 합니다.
+Phase 1~6 코드가 모두 구현되어 있고 자동 테스트 159개가 통과합니다.
+
+Windows에서 A·B·D·E(감사 로그) 구간을 직접 검증했습니다 — 버퍼 편집,
+Ctrl+Z 복구, 승인 거부·만료, CRLF 매칭, 경로 차단까지 전부 통과했습니다.
+**남은 것은 터널·ChatGPT 연동(C)과 `.vsix` 패키징(E-8~E-12)입니다.**
+자세한 현황은 [`VERIFICATION.md`](./VERIFICATION.md)에 있습니다.
 
 ## 개발
 

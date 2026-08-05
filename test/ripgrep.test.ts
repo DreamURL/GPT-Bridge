@@ -77,7 +77,8 @@ describe('search', () => {
       query: 'needle',
       isRegex: false,
       include: 'src/**',
-      maxResults: 50
+      maxResults: 50,
+      contextLines: 2
     });
 
     const util = outcome.blocks.find((block) => block.path === 'src/util.ts');
@@ -98,7 +99,8 @@ describe('search', () => {
       query: 'needle',
       isRegex: false,
       include: undefined,
-      maxResults: 50
+      maxResults: 50,
+      contextLines: 2
     });
     const paths = outcome.blocks.map((block) => block.path);
     assert.ok(!paths.includes('build/bundle.js'));
@@ -111,7 +113,8 @@ describe('search', () => {
       query: 'needle = 2;',
       isRegex: false,
       include: undefined,
-      maxResults: 50
+      maxResults: 50,
+      contextLines: 2
     });
     assert.equal(literal.matchCount, 1);
 
@@ -120,7 +123,8 @@ describe('search', () => {
       query: 'needle = \\d;',
       isRegex: true,
       include: 'src/**',
-      maxResults: 50
+      maxResults: 50,
+      contextLines: 2
     });
     assert.equal(asRegex.matchCount, 2);
 
@@ -129,7 +133,8 @@ describe('search', () => {
       query: 'needle = \\d;',
       isRegex: false,
       include: undefined,
-      maxResults: 50
+      maxResults: 50,
+      contextLines: 2
     });
     assert.equal(noMatch.matchCount, 0);
   });
@@ -140,7 +145,8 @@ describe('search', () => {
       query: '--version',
       isRegex: false,
       include: undefined,
-      maxResults: 50
+      maxResults: 50,
+      contextLines: 2
     });
     assert.equal(outcome.matchCount, 0);
   });
@@ -150,10 +156,63 @@ describe('search', () => {
       query: 'needle',
       isRegex: false,
       include: undefined,
-      maxResults: 1
+      maxResults: 1,
+      contextLines: 2
     });
     assert.equal(outcome.matchCount, 1);
     assert.equal(outcome.truncated, true);
+  });
+
+  it('contextLines 0이면 매치 줄만 반환한다 (컨텍스트 절약)', async () => {
+    const outcome = await rg.search(sandbox, {
+      query: 'needle',
+      isRegex: false,
+      include: 'src/**',
+      maxResults: 50,
+      contextLines: 0
+    });
+
+    const util = outcome.blocks.find((block) => block.path === 'src/util.ts');
+    assert.ok(util !== undefined, 'src/util.ts 블록이 없음');
+
+    // 앞뒤 줄 없이 3행 하나만 와야 한다.
+    assert.deepEqual(util.lines.map((line) => line.number), [3]);
+    assert.ok(util.lines.every((line) => line.isMatch));
+  });
+
+  it('contextLines를 늘리면 더 많은 줄이 온다', async () => {
+    const narrow = await rg.search(sandbox, {
+      query: 'needle = 2;',
+      isRegex: false,
+      include: 'src/**',
+      maxResults: 50,
+      contextLines: 1
+    });
+    const wide = await rg.search(sandbox, {
+      query: 'needle = 2;',
+      isRegex: false,
+      include: 'src/**',
+      maxResults: 50,
+      contextLines: 2
+    });
+
+    const narrowLines = narrow.blocks[0]?.lines.length ?? 0;
+    const wideLines = wide.blocks[0]?.lines.length ?? 0;
+    assert.equal(narrowLines, 3, '앞뒤 1줄이면 3줄');
+    assert.equal(wideLines, 5, '앞뒤 2줄이면 5줄');
+  });
+
+  it('음수 contextLines는 0으로 보정되어 rg가 죽지 않는다', async () => {
+    // 정수 보정을 빼면 rg가 인자 오류(exit 2)로 종료한다.
+    const outcome = await rg.search(sandbox, {
+      query: 'needle',
+      isRegex: false,
+      include: 'src/**',
+      maxResults: 50,
+      contextLines: -3
+    });
+    assert.ok(outcome.matchCount > 0);
+    assert.ok(outcome.blocks.every((block) => block.lines.every((line) => line.isMatch)));
   });
 
   it('매치가 없으면 빈 결과', async () => {
@@ -161,7 +220,8 @@ describe('search', () => {
       query: 'this-string-does-not-exist-anywhere',
       isRegex: false,
       include: undefined,
-      maxResults: 50
+      maxResults: 50,
+      contextLines: 2
     });
     assert.equal(outcome.blocks.length, 0);
     assert.equal(outcome.matchCount, 0);

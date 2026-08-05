@@ -8,6 +8,7 @@ import type { BridgeStateStore } from '../state';
 import { ensureCloudflared } from '../tunnel/binary';
 import { TunnelManager } from '../tunnel/TunnelManager';
 import { PathGuard } from '../workspace/PathGuard';
+import { ReadTracker } from '../workspace/readTracker';
 import { Ripgrep, resolveRgPath } from '../workspace/ripgrep';
 import { McpHttpServer, MCP_ENDPOINT, PortInUseError } from './http';
 import { createConfiguredServer } from './registry';
@@ -36,6 +37,8 @@ export class BridgeServer implements vscode.Disposable {
   private tunnel: TunnelManager | undefined;
   private token: string | undefined;
   private starting = false;
+  /** 세션 동안의 읽기 이력. 서버를 껐다 켜면 초기화된다. */
+  private readonly reads = new ReadTracker();
 
   constructor(private readonly deps: BridgeServerDeps) {}
 
@@ -84,12 +87,17 @@ export class BridgeServer implements vscode.Disposable {
         this.deps.log.info(`ripgrep: ${rgPath}`);
       }
 
+      // 읽기 이력은 서버가 살아 있는 동안 유지된다. 무상태 HTTP 계층과 달리
+      // 이건 세션 개념이 있어야 의미가 있다 — 같은 대화 안에서의 반복을 잡는 것이므로.
+      this.reads.reset();
+
       const ctx: ToolContext = {
         guard,
         root,
         config: (): BridgeConfig => readConfig(),
         log: this.deps.log,
         rg: rgPath === undefined ? undefined : new Ripgrep(rgPath),
+        reads: this.reads,
         onBlocked: (tool, reason, requestedPath) => {
           // 차단된 접근 시도는 조용히 실패시키지 않는다 (project.md §5.5).
           this.deps.log.warn(`차단됨 — ${tool}(${requestedPath}): ${reason}`);

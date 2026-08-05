@@ -2,29 +2,39 @@ import { z } from 'zod';
 import { isListingExcluded } from '../../workspace/denyList';
 import { errorResult, textResult, wrapFileContent, type ToolContext, type ToolResult } from './types';
 
-export const SEARCH_TEXT_DESCRIPTION = `워크스페이스 전체에서 텍스트를 찾는다. 매치 줄과 앞뒤 2줄을 반환한다.
+export const SEARCH_TEXT_DESCRIPTION = `워크스페이스 전체에서 텍스트를 찾는다.
 
 언제 쓰나: 심볼·함수·문자열이 어디에 있는지 모를 때. 파일을 하나씩 열어 보는
-대신 이 툴로 위치를 먼저 특정한다.
+대신 이 툴로 위치를 먼저 특정한다. **이미 읽은 파일을 다시 통째로 읽는 대신
+이 툴로 고칠 지점을 찾는 것이 훨씬 싸다.**
 
 언제 쓰지 않나: 파일 경로를 이미 아는 경우에는 read_file이 낫다.
 파일 이름 자체를 찾을 때는 list_directory를 쓴다.
 
-호출 순서: search_text로 위치 확인 → read_file로 주변 맥락 확인 → edit_file
+호출 순서: search_text로 위치 확인 → read_file로 그 범위만 확인 → edit_file
 
 검색은 대소문자를 구분한다. .gitignore 등재 파일과 node_modules는 제외된다.
 
 파라미터
-  query        찾을 문자열. 기본은 정규식이 아니라 그대로 매칭한다.
-  is_regex     true면 정규식으로 해석한다. 기본 false
-  include      대상을 좁히는 glob. 예: "src/**/*.ts"
-  max_results  최대 매치 수. 기본 50`;
+  query          찾을 문자열. 기본은 정규식이 아니라 그대로 매칭한다.
+  is_regex       true면 정규식으로 해석한다. 기본 false
+  include        대상을 좁히는 glob. 예: "src/**/*.ts"
+  max_results    최대 매치 수. 기본 50
+  context_lines  매치 줄 앞뒤로 함께 볼 줄 수. 0~5, 기본 2.
+                 **위치만 알면 될 때는 0을 쓴다.** 매치가 많을수록 차이가 크다.`;
 
 export const searchTextSchema = {
   query: z.string().min(1).describe('찾을 문자열. 예: "createServer"'),
   is_regex: z.boolean().optional().describe('true면 정규식으로 해석한다. 기본 false'),
   include: z.string().optional().describe('대상을 좁히는 glob. 예: "src/**/*.ts"'),
-  max_results: z.number().int().min(1).max(200).optional().describe('최대 매치 수. 기본 50')
+  max_results: z.number().int().min(1).max(200).optional().describe('최대 매치 수. 기본 50'),
+  context_lines: z
+    .number()
+    .int()
+    .min(0)
+    .max(5)
+    .optional()
+    .describe('매치 줄 앞뒤 줄 수. 0~5, 기본 2. 위치만 알면 될 때는 0')
 };
 
 export interface SearchTextArgs {
@@ -32,6 +42,7 @@ export interface SearchTextArgs {
   is_regex?: boolean | undefined;
   include?: string | undefined;
   max_results?: number | undefined;
+  context_lines?: number | undefined;
 }
 
 export async function searchTextTool(ctx: ToolContext, args: SearchTextArgs): Promise<ToolResult> {
@@ -45,7 +56,8 @@ export async function searchTextTool(ctx: ToolContext, args: SearchTextArgs): Pr
     query: args.query,
     isRegex: args.is_regex ?? false,
     include: args.include,
-    maxResults: args.max_results ?? 50
+    maxResults: args.max_results ?? 50,
+    contextLines: args.context_lines ?? 2
   });
 
   // 거부 목록·node_modules에 걸린 파일은 검색 결과에서도 제외한다.
