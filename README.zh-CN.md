@@ -250,7 +250,26 @@ npm run watch       # 监听变更
 npm run package     # 仅生成 .vsix
 ```
 
-在 VS Code 中打开此文件夹并按 `F5`，即可启动扩展开发宿主。
+用 `F5` 启动扩展开发宿主需要 `.vscode/launch.json`。
+它属于编辑器的个人配置，没有提交到仓库，请自行创建：
+
+```jsonc
+// .vscode/launch.json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "运行扩展",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
+    }
+  ]
+}
+```
+
+请先启动 `npm run watch`，再按 `F5`。
 
 ## 许可证
 

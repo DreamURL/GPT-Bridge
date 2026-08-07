@@ -5,6 +5,9 @@ out/
 .DS_Store
 out-test/
 
+# 에디터 개인 설정. F5 디버그 구성이 필요하면 README 개발 절 참고.
+.vscode/
+
 # OpenAI Secure MCP Tunnel 클라이언트. 이 확장의 소스가 아니라 외부 도구다.
 # 83MB(cloudflared.exe 포함)라 커밋하면 저장소가 못 쓰게 된다.
 tunnel-client-*/

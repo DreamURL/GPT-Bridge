@@ -257,7 +257,26 @@ npm run watch       # 変更監視
 npm run package     # .vsix の生成のみ
 ```
 
-VS Code でこのフォルダを開き `F5` を押すと拡張機能開発ホストが起動します。
+`F5` で拡張機能開発ホストを起動するには `.vscode/launch.json` が必要です。
+エディタの個人設定なのでリポジトリには含めていません。自分で作成してください。
+
+```jsonc
+// .vscode/launch.json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "拡張機能を実行",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
+    }
+  ]
+}
+```
+
+先に `npm run watch` を起動してから `F5` を押してください。
 
 ## ライセンス
 

@@ -249,7 +249,26 @@ npm run watch       # 변경 감시
 npm run package     # .vsix 생성만
 ```
 
-VS Code에서 이 폴더를 열고 `F5`를 누르면 확장 개발 호스트가 뜹니다.
+`F5`로 확장 개발 호스트를 띄우려면 `.vscode/launch.json`이 필요합니다.
+에디터 개인 설정이라 저장소에 넣지 않았으니 직접 만드세요.
+
+```jsonc
+// .vscode/launch.json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "확장 실행",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
+    }
+  ]
+}
+```
+
+먼저 `npm run watch`를 띄워 두고 `F5`를 누르면 됩니다.
 
 ## 라이선스
 

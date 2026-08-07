@@ -258,7 +258,26 @@ npm run watch       # watch mode
 npm run package     # build the .vsix only
 ```
 
-Open this folder in VS Code and press `F5` to launch the Extension Development Host.
+Launching the Extension Development Host with `F5` needs a `.vscode/launch.json`.
+That is personal editor configuration and is not committed, so create it yourself:
+
+```jsonc
+// .vscode/launch.json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
+    }
+  ]
+}
+```
+
+Start `npm run watch` first, then press `F5`.
 
 ## License
 
