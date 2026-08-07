@@ -116,7 +116,17 @@ export class BridgeViewProvider implements vscode.WebviewViewProvider {
           ? `http://127.0.0.1:${state.port}${MCP_ENDPOINT}`
           : undefined;
 
-    const isLocalOnly = state.tunnelUrl === undefined && connectorUrl !== undefined;
+    // 터널 URL이 없는 상태는 두 가지이고 뜻이 정반대다.
+    //   provider=cloudflare → 확장이 터널을 띄우려다 실패했다. 진짜 경고.
+    //   provider=none       → 터널을 확장이 만들지 않는 구성이다. OpenAI Secure
+    //                         MCP Tunnel처럼 외부 터널을 따로 띄워 쓰는 경우이며,
+    //                         ChatGPT에서 접근이 될 수도 있다. 확장은 알 수 없다.
+    // 둘을 같은 문구로 묶으면 정상 구성에 대고 "ChatGPT에서 접근할 수 없습니다"라고
+    // 단언하게 된다. 상태 표시가 실제와 어긋나는 것은 그 자체로 문제다.
+    const noTunnelUrl = state.tunnelUrl === undefined && connectorUrl !== undefined;
+    const externalTunnel = config.tunnelProvider === 'none';
+    const isLocalOnly = noTunnelUrl && !externalTunnel;
+    const isExternalTunnel = noTunnelUrl && externalTunnel;
     const quickTunnel = state.tunnelUrl?.includes('trycloudflare.com') === true;
 
     return `<!DOCTYPE html>
@@ -157,6 +167,13 @@ export class BridgeViewProvider implements vscode.WebviewViewProvider {
     color: var(--vscode-inputValidation-warningForeground, var(--vscode-foreground));
     background: var(--vscode-inputValidation-warningBackground);
     border: 1px solid var(--vscode-inputValidation-warningBorder);
+    border-radius: 2px; padding: 6px 8px; margin-top: 8px; line-height: 1.5;
+  }
+  /* 경고가 아니라 구성 안내. 정상 상태에 경고색을 쓰면 신호가 무뎌진다. */
+  .info {
+    color: var(--vscode-inputValidation-infoForeground, var(--vscode-foreground));
+    background: var(--vscode-inputValidation-infoBackground);
+    border: 1px solid var(--vscode-inputValidation-infoBorder);
     border-radius: 2px; padding: 6px 8px; margin-top: 8px; line-height: 1.5;
   }
   label.field { display: block; font-size: 11px; margin: 10px 0 3px; color: var(--vscode-descriptionForeground); }
@@ -233,6 +250,11 @@ export class BridgeViewProvider implements vscode.WebviewViewProvider {
     ${
       isLocalOnly
         ? `<div class="warn">터널이 연결되지 않아 로컬 주소만 사용할 수 있습니다. ChatGPT 웹에서는 접근할 수 없고, MCP Inspector 같은 로컬 도구로만 확인할 수 있습니다.</div>`
+        : ''
+    }
+    ${
+      isExternalTunnel
+        ? `<div class="info">확장이 터널을 만들지 않는 구성입니다 (<code>tunnel.provider = none</code>). 위 주소는 로컬 엔드포인트이며, <b>OpenAI Secure MCP Tunnel</b> 같은 외부 터널을 따로 띄워 두었다면 ChatGPT에서 접근할 수 있습니다. 외부 터널의 연결 상태는 확장이 알 수 없으니 그쪽 도구에서 확인하세요.</div>`
         : ''
     }
     ${

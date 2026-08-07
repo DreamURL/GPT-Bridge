@@ -60,33 +60,48 @@ ChatGPT의 커넥터 등록 화면에는 인증 선택지가 `OAuth` / `인증�
 
 ---
 
-## 1단계 💻🧩 — GPT Bridge 확장 설치
+## 1단계 💻 — GPT Bridge 확장 설치
 
-터널을 붙일 대상이 먼저 있어야 합니다.
+터널을 붙일 대상이 먼저 있어야 합니다. **명령 네 줄이면 끝납니다.**
 
-### 빌드 (명령 프롬프트)
-
-저장소 폴더에서:
+필요한 것: [Git](https://git-scm.com/downloads),
+[Node.js](https://nodejs.org/) (LTS), VS Code.
 
 ```cmd
+git clone https://github.com/DreamURL/vscodeconnector.git
+cd vscodeconnector
 npm install
-npm run package
+npm run setup
 ```
 
-`gpt-bridge-0.1.0.vsix` 파일이 만들어집니다.
-
-> ⚠️ **`.vsix`는 반드시 그 PC에서 만드세요.** 파일 검색에 쓰는 ripgrep이 OS·CPU별로
-> 다른 파일이고 `npm install`은 설치하는 기기의 것만 받습니다. 다른 데서 만든
-> `.vsix`를 가져오면 검색·목록 기능이 조용히 죽습니다(`project.md` §2.1).
-> 같은 Windows x64끼리는 복사해 써도 됩니다.
-
-### 설치 (VS Code 화면에서)
-
-1. VS Code 왼쪽 **확장** 아이콘 클릭
-2. 확장 패널 오른쪽 위 **`...`** → **VSIX에서 설치**
-3. 방금 만든 `gpt-bridge-0.1.0.vsix` 선택
+`npm run setup` 이 빌드(`.vsix` 생성)와 설치를 한 번에 합니다.
+끝나면 VS Code에서 `Ctrl+Shift+P` → **`Developer: Reload Window`**.
 
 왼쪽 활동 표시줄에 GPT Bridge 아이콘이 생기면 설치된 것입니다.
+
+> ⚠️ **`.vsix`를 다른 PC에서 복사해 오지 마세요.** 파일 검색에 쓰는 ripgrep이
+> OS·CPU별로 다른 파일이고 `npm install`은 설치하는 기기의 것만 받습니다. 다른
+> 데서 만든 `.vsix`를 가져오면 검색·목록 기능이 조용히 죽습니다(`project.md` §2.1).
+> 그래서 저장소에 `.vsix`를 넣지 않고 각 기기에서 빌드하게 되어 있습니다.
+
+### `code` 명령을 못 찾는다고 나오면
+
+빌드는 됐고 설치만 실패한 것입니다. VS Code 화면에서 직접 넣으면 됩니다.
+
+1. 왼쪽 **확장** 아이콘 클릭
+2. 확장 패널 오른쪽 위 **`...`** → **VSIX에서 설치**
+3. 저장소 폴더의 `gpt-bridge-0.1.0.vsix` 선택
+
+`code` 명령을 쓰고 싶으면 `Ctrl+Shift+P` →
+`Shell Command: Install 'code' command in PATH` 를 실행해 두세요.
+
+### 나중에 최신으로 갱신할 때
+
+```cmd
+git pull
+npm install
+npm run setup
+```
 
 ---
 
@@ -499,9 +514,7 @@ Cloudflare로 하면 워크스페이스가 공개 HTTPS 주소로 열리고 토�
 ## 다른 PC에 설치할 때 체크리스트
 
 ```
-[ ] 저장소 clone
-[ ] npm install → npm run package          (그 PC에서 직접. ripgrep 때문)
-[ ] VS Code 확장 패널 → VSIX에서 설치
+[ ] git clone → npm install → npm run setup   (그 PC에서 직접. ripgrep 때문)
 [ ] OpenAI에 터널 만들기 → 터널ID 확보      (PC마다 따로 권장)
 [ ] API 키 발급 (Tunnels Read + Use)
 [ ] tunnel-client 내려받기 + 해시 확인

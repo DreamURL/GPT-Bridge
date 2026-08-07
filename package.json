@@ -170,6 +170,7 @@
     "build:tests": "node esbuild.mjs --tests",
     "test": "npm run build:tests && node --test --test-reporter=spec \"out-test/*.test.js\"",
     "compile": "npm run typecheck && npm run build && npm test",
+    "setup": "npm run package && node scripts/install.mjs",
     "vscode:prepublish": "npm run typecheck && npm run build:prod",
     "package": "vsce package --allow-missing-repository"
   },

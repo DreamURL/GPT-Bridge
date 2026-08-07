@@ -25,14 +25,31 @@ URL이 생기지 않고 토큰이 PC를 벗어나지 않아 더 안전합니다.
 
 자세한 현황은 [`VERIFICATION.md`](./VERIFICATION.md)에 있습니다.
 
+## 설치
+
+```bash
+git clone https://github.com/DreamURL/vscodeconnector.git
+cd vscodeconnector
+npm install
+npm run setup       # .vsix 빌드 + VS Code에 설치
+```
+
+이후 VS Code에서 `Developer: Reload Window`. 왼쪽 활동 표시줄에 GPT Bridge
+아이콘이 생깁니다. 갱신할 때는 `git pull && npm install && npm run setup`.
+
+**`.vsix`는 저장소에 넣지 않고 각 기기에서 빌드합니다.** ripgrep 바이너리가
+플랫폼별로 갈라져 있어 다른 기기에서 만든 `.vsix`는 검색이 동작하지 않습니다(§2.1).
+
+ChatGPT까지 연결하려면 [`TUNNEL_SETUP.md`](./TUNNEL_SETUP.md)를 이어서 보세요.
+
 ## 개발
 
 ```bash
-npm install
 npm run typecheck   # tsc --noEmit
 npm run build       # esbuild → dist/extension.js
 npm run watch       # 변경 감시
-npm run package     # .vsix 생성
+npm run compile     # typecheck + build + test
+npm run package     # .vsix 생성만
 ```
 
 VS Code에서 이 폴더를 열고 F5를 누르면 확장 개발 호스트가 뜹니다.
