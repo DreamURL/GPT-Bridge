@@ -36,8 +36,8 @@ Requirements: [Git](https://git-scm.com/downloads),
 [Node.js](https://nodejs.org/) (LTS), [VS Code](https://code.visualstudio.com/) 1.90+.
 
 ```bash
-git clone https://github.com/DreamURL/vscodeconnector.git
-cd vscodeconnector
+git clone https://github.com/DreamURL/GPT-Bridge.git
+cd GPT-Bridge
 npm install
 npm run setup
 ```
@@ -46,7 +46,7 @@ npm run setup
 run `Ctrl+Shift+P` → **`Developer: Reload Window`** in VS Code. The GPT Bridge
 icon appears in the left activity bar.
 
-> Why `cd vscodeconnector`? `git clone` **creates a new folder** named after the
+> Why `cd GPT-Bridge`? `git clone` **creates a new folder** named after the
 > repository and puts the files inside it. You stay in the parent directory when
 > it finishes, so you have to step into that folder for `npm install` to work.
 

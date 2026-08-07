@@ -14,8 +14,7 @@ GPT Bridge를 ChatGPT에 연결하는 전체 절차입니다.
 | 💻 | 명령 프롬프트 |
 | 🧩 | VS Code |
 
-- 설계 배경: [`project.md`](./project.md)
-- 검증 항목: [`VERIFICATION.md`](./VERIFICATION.md) C-T 절
+확장 자체의 개요·보안·설정은 [`README.md`](./README.md)에 있습니다.
 
 ---
 
@@ -68,8 +67,8 @@ ChatGPT의 커넥터 등록 화면에는 인증 선택지가 `OAuth` / `인증�
 [Node.js](https://nodejs.org/) (LTS), VS Code.
 
 ```cmd
-git clone https://github.com/DreamURL/vscodeconnector.git
-cd vscodeconnector
+git clone https://github.com/DreamURL/GPT-Bridge.git
+cd GPT-Bridge
 npm install
 npm run setup
 ```
@@ -81,7 +80,7 @@ npm run setup
 
 > ⚠️ **`.vsix`를 다른 PC에서 복사해 오지 마세요.** 파일 검색에 쓰는 ripgrep이
 > OS·CPU별로 다른 파일이고 `npm install`은 설치하는 기기의 것만 받습니다. 다른
-> 데서 만든 `.vsix`를 가져오면 검색·목록 기능이 조용히 죽습니다(`project.md` §2.1).
+> 데서 만든 `.vsix`를 가져오면 검색·목록 기능이 조용히 죽습니다(README의 "`.vsix`를 다른 PC에서 복사해 오지 마세요" 참고).
 > 그래서 저장소에 `.vsix`를 넣지 않고 각 기기에서 빌드하게 되어 있습니다.
 
 ### `code` 명령을 못 찾는다고 나오면
@@ -162,7 +161,7 @@ npm run setup
 ### 해시 확인 (명령 프롬프트 — 한 줄)
 
 받은 파일이 중간에 바뀌지 않았는지 확인합니다. 남이 만든 실행 파일을 그냥 돌리지
-않는다는 원칙이고, 이 확장이 cloudflared에 대해 하는 것과 같은 절차입니다(§6.1).
+않는다는 원칙이고, 이 확장이 cloudflared에 대해 하는 것과 같은 절차입니다.
 
 명령 프롬프트에서 (파일명은 받은 버전에 맞게):
 
@@ -410,7 +409,7 @@ ChatGPT에 붙여넣습니다. **커넥터 등록 화면에는 지침 칸이 없
 > 지침이 대화 맨 앞에 있는 형태라 모델이 가장 잘 따릅니다.
 
 **선택이 아니라 사실상 필수입니다.** GPT는 명시적으로 시키지 않으면 커스텀 툴을
-잘 부르지 않습니다(`project.md` §10-3). 지침에는 `edit_file` 우선 사용, 수정 후
+잘 부르지 않습니다(README "지침 넣기" 참고). 지침에는 `edit_file` 우선 사용, 수정 후
 `get_diagnostics` 확인, 같은 파일 반복 읽기 금지(6~11번) 같은 내용도 들어 있어
 빠뜨리면 토큰이 훨씬 빨리 소진됩니다.
 
@@ -451,8 +450,8 @@ notepad %APPDATA%\Code\User\globalStorage\local.gpt-bridge\audit\audit.jsonl
 | 연결은 되는데 전부 실패 | `auth_failure` / `missing` | `extra_headers` 를 안 넣었거나 들여쓰기가 틀림 |
 | 〃 | `auth_failure` / `malformed` | `Bearer ` 접두사 누락 |
 | 〃 | `auth_failure` / `mismatch` | 토큰 값이 틀림. **재발급 후 설정 파일을 안 고쳤을 때** 가장 흔함 |
-| 툴 목록에 검색이 없음 | — | ripgrep 누락. 그 PC에서 `.vsix`를 다시 만들어야 함 (§2.1) |
-| GPT가 툴을 아예 안 부름 | 아무것도 없음 | 커스텀 지침 미적용 (§10-3) |
+| 툴 목록에 검색이 없음 | — | ripgrep 누락. 그 PC에서 `.vsix`를 다시 만들어야 함 |
+| GPT가 툴을 아예 안 부름 | 아무것도 없음 | 커스텀 지침 미적용 (9단계) |
 | `doctor` 가 API 키 오류 | — | 키 권한에 Tunnels Read+Use 가 없거나 관리자 키를 잘못 넣음 |
 | 설정 파일을 못 읽는다 | — | `gpt-bridge.yaml.txt` 로 저장됐을 가능성. 탐색기에서 확장자 표시를 켜고 확인 |
 | `.bat` 실행 시 `'...'은(는) 내부 또는 외부 명령이 아닙니다` 가 쏟아짐 | — | 배치 파일에 한글이 들어갔고 UTF-8로 저장됨. **안내 문구를 영문으로** 바꾸세요 (8단계 경고) |
@@ -506,7 +505,7 @@ OpenAI 공식 가격표에 tunnel 항목이 없고 가이드 문서에도 언급
 **이 방식이 Cloudflare 경로보다 안전합니다.**
 Cloudflare로 하면 워크스페이스가 공개 HTTPS 주소로 열리고 토큰을 ChatGPT 설정에
 붙여넣어야 합니다. 이 방식은 공개 주소가 생기지 않고 **토큰이 PC를 벗어나지
-않습니다.** `project.md` §5.7이 감수 사항으로 적어 둔 "토큰 유출 = 전체 노출"의
+않습니다.** README 보안 절이 감수 사항으로 적어 둔 "토큰 유출 = 전체 노출"의
 노출면이 그만큼 줄어듭니다.
 
 ---

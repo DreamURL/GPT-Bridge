@@ -35,8 +35,8 @@
 [Node.js](https://nodejs.org/)（LTS）、[VS Code](https://code.visualstudio.com/) 1.90 以上。
 
 ```bash
-git clone https://github.com/DreamURL/vscodeconnector.git
-cd vscodeconnector
+git clone https://github.com/DreamURL/GPT-Bridge.git
+cd GPT-Bridge
 npm install
 npm run setup
 ```
@@ -44,7 +44,7 @@ npm run setup
 `npm run setup` 会一次完成 `.vsix` 构建和安装。完成后在 VS Code 中执行
 `Ctrl+Shift+P` → **`Developer: Reload Window`**。左侧活动栏会出现 GPT Bridge 图标。
 
-> 为什么需要 `cd vscodeconnector`？`git clone` 会在当前位置**新建一个**以仓库
+> 为什么需要 `cd GPT-Bridge`？`git clone` 会在当前位置**新建一个**以仓库
 > 命名的文件夹并把文件放进去。命令结束时你仍然在外层目录，必须进入该文件夹
 > `npm install` 才能正常工作。
 

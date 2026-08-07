@@ -35,8 +35,8 @@
 [Node.js](https://nodejs.org/)（LTS）、[VS Code](https://code.visualstudio.com/) 1.90 以上。
 
 ```bash
-git clone https://github.com/DreamURL/vscodeconnector.git
-cd vscodeconnector
+git clone https://github.com/DreamURL/GPT-Bridge.git
+cd GPT-Bridge
 npm install
 npm run setup
 ```
@@ -45,7 +45,7 @@ npm run setup
 完了したら VS Code で `Ctrl+Shift+P` → **`Developer: Reload Window`** を実行してください。
 左のアクティビティバーに GPT Bridge のアイコンが現れます。
 
-> `cd vscodeconnector` が必要な理由 — `git clone` はリポジトリ名の
+> `cd GPT-Bridge` が必要な理由 — `git clone` はリポジトリ名の
 > **フォルダを新しく作り**、その中にファイルを配置します。コマンドが終わっても
 > 自分がいる場所は外側なので、そのフォルダに入らないと `npm install` が正しく動きません。
 

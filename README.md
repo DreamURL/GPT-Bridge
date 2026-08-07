@@ -35,8 +35,8 @@
 [Node.js](https://nodejs.org/) (LTS), [VS Code](https://code.visualstudio.com/) 1.90 이상.
 
 ```bash
-git clone https://github.com/DreamURL/vscodeconnector.git
-cd vscodeconnector
+git clone https://github.com/DreamURL/GPT-Bridge.git
+cd GPT-Bridge
 npm install
 npm run setup
 ```
@@ -45,7 +45,7 @@ npm run setup
 끝나면 VS Code에서 `Ctrl+Shift+P` → **`Developer: Reload Window`**.
 왼쪽 활동 표시줄에 GPT Bridge 아이콘이 생기면 설치된 것입니다.
 
-> `cd vscodeconnector`가 필요한 이유 — `git clone`은 현재 위치에 저장소 이름으로
+> `cd GPT-Bridge`가 필요한 이유 — `git clone`은 현재 위치에 저장소 이름으로
 > **폴더를 새로 만들고** 그 안에 파일을 넣습니다. 명령이 끝나도 내 위치는 바깥이라
 > 그 폴더로 들어가야 `npm install`이 제대로 돕니다.
 
