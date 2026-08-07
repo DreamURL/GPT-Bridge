@@ -8,9 +8,15 @@ tsconfig.json
 **/*.map
 PROGRESS.md
 project.md
+VERIFICATION.md
+TUNNEL_SETUP.md
 
 test/**
 out-test/**
+
+# OpenAI 터널 클라이언트. 저장소 안에 두더라도 .vsix에는 절대 넣지 않는다(83MB).
+tunnel-client-*/**
+tunnel-client-*.zip
 
 # node_modules는 통째로 제외하되 ripgrep 바이너리만 되살린다 (project.md §2.1).
 #

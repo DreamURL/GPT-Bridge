@@ -289,6 +289,11 @@ export class BridgeServer implements vscode.Disposable {
   }
 
   async stop(): Promise<void> {
+    // 서버가 실제로 떠 있었을 때만 기록한다. 이 메서드는 시작 실패 후의 정리와
+    // dispose()에서도 불리는데, 그때까지 남기면 뜬 적 없는 서버의 종료가 찍히거나
+    // 같은 종료가 두 번 찍혀 "이 시점에 서버가 살아 있었나"를 되짚을 수 없게 된다.
+    const wasRunning = this.http !== undefined;
+
     // 세션 자동 승인은 서버를 내리면 해제한다. 기획안은 확장 리로드 시
     // 해제를 요구하지만, 서버를 껐다 켠 것도 새 세션으로 보는 편이 안전하다.
     this.deps.approvalGate.resetSession();
@@ -305,6 +310,10 @@ export class BridgeServer implements vscode.Disposable {
       await http.stop();
     }
     this.deps.store.update({ status: 'stopped', port: undefined, tunnelUrl: undefined });
+
+    if (wasRunning) {
+      this.deps.audit.append({ kind: 'server', detail: 'stopped', ok: true });
+    }
   }
 
   /** 토큰 재발급 시 호출. 실행 중이면 즉시 새 토큰만 유효해진다. */

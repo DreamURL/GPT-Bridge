@@ -145,9 +145,8 @@ npm test   →  tests 51 / pass 51 / fail 0
   실제 동작(진단 수집, 미저장 버퍼 읽기, 탭 목록)은 로컬 F5 확인이 필요하다.
 - **SSE vs JSON 응답 형식.** 현재 SDK 기본값(SSE 스트림)을 쓴다. ChatGPT 커넥터가
   `enableJsonResponse: true`를 요구하면 Phase 3에서 조정한다.
-- **DNS 리바인딩 보호 미적용.** `allowedHosts`를 켜면 터널 도메인을 화이트리스트에
-  넣어야 하는데 Quick Tunnel은 URL이 매번 바뀐다. 루프백 바인드 + Bearer + CORS 미적용으로
-  대응하고 Phase 3에서 Named Tunnel 고정 도메인이 생기면 재검토한다.
+- ~~DNS 리바인딩 보호 미적용~~ → **닫음(rev.4).** "Phase 3에서 재검토"로 열어 두었던
+  항목이다. 도입하지 않기로 확정했다. 아래 「보안 범위 확정」과 project.md §5.7 참조.
 - **TOCTOU.** PathGuard가 경로를 검증한 뒤 툴이 파일을 여는 사이에 심볼릭 링크가
   바뀔 수 있다. 개인 사용 전제라 현재는 감수한다.
 - `any` 금지 컴파일러 강제는 여전히 미적용(Phase 1에서 이월).
@@ -365,6 +364,16 @@ Windows에서 여는 것"이기 때문이다. → project.md §5.3.1 신설.
 `tool_call` · `path_denied` · `approval_denied` · `approval_expired` ·
 `expired_choice` · `disk_write` · `auth_failure` · `server`
 
+> **2026-08-07 보강.** `server`가 `started` / `deactivated`만 남기고 **`gptBridge.stop`
+> 명령은 아무 기록도 남기지 않았다.** 08-07 검증 로그에서 짝이 맞지 않는 `started`가
+> 발견되어 드러났다. `stop()`에 `stopped`를 추가했다.
+>
+> 단순히 append하면 안 된다. `stop()`은 **시작 실패 후의 정리**(`start()`의 catch)와
+> `dispose()`에서도 불린다. 그대로 두면 뜬 적 없는 서버의 종료가 찍히거나 같은
+> 종료가 두 번 찍혀 로그가 오히려 부정확해진다. 진입 시점의 `this.http` 유무로
+> **실제로 떠 있었을 때만** 기록한다. EADDRINUSE로 실패하면 `this.http`가
+> 할당되기 전이라 자연히 걸러진다.
+
 `detail`은 500자에서 자른다. 자르지 않으면 `write_file`의 인자 요약에 파일 내용이
 통째로 들어간다.
 
@@ -392,10 +401,9 @@ external이라 로드 시점에 터진다. 순수 모듈(`workspace/redact.ts`)�
 
 ### 미해결
 
-- **`.vsix` 패키징 검증이 Linux 기준이다.** 이 환경에서 만든 `.vsix`에는
-  `ripgrep-linux-x64`가 들어간다. 대상 환경이 Windows이므로 **Windows에서 다시
-  패키징해 `rg.exe` 포함과 검색 동작을 확인해야 한다.** VERIFICATION.md E-8~E-12.
-- 로컬 설치(`code --install-extension`) 미검증.
+- ~~`.vsix` 패키징 검증이 Linux 기준이다~~ → **2026-08-07 Windows에서 해소.** 아래
+  「Windows 패키징 실측」 참조. 설치본에서의 실제 검색 동작(E-11~12)만 남았다.
+- ~~로컬 설치(`code --install-extension`) 미검증~~ → **해소.** `local.gpt-bridge@0.1.0` 설치 확인.
 
 ---
 
@@ -517,7 +525,166 @@ end_line=99999`로 우회할 수 있어 제한을 명시적 범위 요청에도 
 
 ---
 
+## Windows 패키징 실측 (2026-08-07) ✅
+
+Phase 5의 마지막 미해결 항목이었다. Linux 컨테이너에서 만든 `.vsix`에는
+`ripgrep-linux-x64`가 들어가므로 Windows에서 다시 만들어 확인해야 했다.
+
+| 항목 | 결과 |
+|---|---|
+| 자동 테스트 재확인 | 159개 중 158 통과 / 1 skip (심볼릭 링크, §10-13의 예고된 동작) |
+| E-8 `rg.exe` 포함 | ✅ `ripgrep-win32-x64/bin/rg.exe` 5.18MB |
+| E-8 설치본에서 실행 | ✅ `ripgrep 15.0.0` — 실행 권한·경로 모두 정상 |
+| E-9 소스·문서 제외 | ⚠️ **결함 1건 발견 후 수정** (아래) |
+| E-10 로컬 설치 | ✅ `local.gpt-bridge@0.1.0` |
+
+### 발견한 결함 — `.vscodeignore`에 `VERIFICATION.md`가 빠져 있었다
+
+`PROGRESS.md`와 `project.md`는 제외 규칙이 있는데 `VERIFICATION.md`만 없어서
+22KB짜리 내부 검증 문서가 `.vsix`에 실려 나갔다. Phase 1에서 `.vscodeignore`를
+쓸 당시 이 문서가 없었고(Phase 5에서 생김), 문서를 추가하면서 제외 규칙을
+갱신하지 않은 것이다.
+
+규칙 한 줄을 추가하고 재패키징해 16개 → **15개 파일 2.72MB**로 정리했다.
+
+> 교훈: 저장소에 새 문서를 추가할 때 `.vscodeignore`를 함께 본다. 소스는
+> `src/**` 같은 와일드카드로 걸리지만 **루트의 문서 파일은 하나씩 이름으로
+> 적히므로 자동으로 걸러지지 않는다.**
+
+`vsce`가 `LICENSE` 파일이 없다고 경고한다. `package.json`에는 `"license": "MIT"`가
+있으나 파일이 없어서다. 마켓플레이스에 올리지 않으므로 그대로 둔다.
+
+---
+
+## 검색 결과 절단 안내 개선 (2026-08-07)
+
+G-7 검증 중 사용자가 지적해 드러났다. `search_text`가
+`"결과가 상한에 걸려 잘렸습니다"`만 말하고 **얼마나 잘렸는지는 말하지 않았다.**
+
+### 무엇이 문제였나
+
+`parseSearchOutput`이 상한에 닿으면 세는 것을 멈췄다.
+
+```ts
+if (matchCount >= maxResults) { overflow = true; continue; }   // 여기서 카운트 정지
+matchCount += 1;
+```
+
+그래서 실제 99건인데 응답 머리는 `50건 매치`였다. 모델 입장에서 **50건이 전부인지
+1000건 중 50건인지 구분할 방법이 없다.** 범위를 좁힐 판단 근거가 없으니 찾던 대상이
+뒤쪽 파일에 있으면 그대로 놓친다. 사용자가 "AI가 못 찾고 토큰만 낭비한다"고 지적한
+지점이 정확히 이것이다.
+
+원인 하나가 더 있었다. `truncated`는 boolean 하나인데 이를 세우는 원인이 셋이었다
+— `max_results` 상한 / 10초 타임아웃 / stdout 32MB 초과. 그런데 안내는 언제나
+"`max_results`로 조정하세요"였다. **타임아웃이나 용량 때문에 잘렸다면 이건 악화시키는
+조언이다.**
+
+### 고친 것
+
+| 항목 | 파일 |
+|---|---|
+| 상한을 넘어도 전체 매치 수를 끝까지 셈 (`totalMatches`) | `workspace/ripgrep.ts` |
+| 절단 원인 구분 (`none`/`limit`/`timeout`/`output`) | `workspace/ripgrep.ts` |
+| 원인별 안내 문구 분기 | `mcp/tools/searchText.ts` |
+| 머리글에 분모 표시 — `전체 99건 중 50건 표시` | `mcp/tools/searchText.ts` |
+| `max_results` 상한 200 → **500** | `mcp/tools/searchText.ts` |
+
+세는 비용은 없다. rg에 `--max-count`를 주지 않으므로 stdout에는 이미 전체 매치가
+들어 있고, 우리가 파싱하면서 버리고 있었을 뿐이다.
+
+표시 건수는 **차단 파일을 걸러낸 뒤 실제로 찍힌 매치 줄**을 다시 센다. rg가 센 값을
+그대로 쓰면 `.env` 같은 제외 대상의 매치까지 포함해 보이는 것보다 큰 수를 보고한다.
+
+`truncated` boolean은 남겨 뒀다. `truncation !== 'none'`의 축약이며 기존 호출부와
+테스트가 계속 쓴다.
+
+### 테스트 — 163개 (4개 추가)
+
+`ripgrep.test.ts`에 추가했다. 핵심은 **상한을 바꿔도 `totalMatches`가 변하지 않는지**다.
+같은 질의를 `maxResults: 50`과 `1`로 두 번 돌려 `matchCount`는 달라지되
+`totalMatches`는 같아야 한다는 것을 확인한다. 300건짜리 파일로 상한 500이 실제로
+한 번에 들어오는 것도 확인했다.
+
+→ project.md §4.1.1 신설.
+
+---
+
+## 보안 범위 확정 (rev.4)
+
+Phase 2부터 "재검토"로 열어 둔 인증·노출 계층 항목들을 닫았다. 결론은
+**현재 수준으로 충분하다**이고, 근거와 전제는 project.md §5.7에 정리했다.
+
+확정한 인증 수준 — 32바이트 Bearer 토큰 + 루프백 바인드 + CORS 미적용. 이 셋이다.
+
+도입하지 않기로 한 것: DNS 리바인딩 보호(`allowedHosts`), mTLS, 출발지 IP 제한,
+토큰 자동 만료·회전. 각각 이유가 다르지만 공통점이 하나 있다 — **막아 주는 것에
+비해 운영 비용이 크거나, 이미 다른 층이 같은 경로를 막고 있다.** 리바인딩이
+후자의 예다. 브라우저를 경유하는 공격인데 CORS를 켜지 않아 그 경로가 이미 닫혀 있다.
+
+### 이 결정이 뜻하는 것
+
+토큰이 새면 워크스페이스가 통째로 열린다. 이건 감수한 것이지 놓친 것이 아니다.
+인증을 더 두껍게 만들어도 "토큰을 아는 자"는 어차피 막지 못하므로, 그 뒤를 지키는
+§5.3(경로 검증)과 §5.4(승인 게이트)에 무게를 둔다. 둘 다 Windows 실측에서
+확인했다(D-1~D-21, B-S1~S11).
+
+실무적으로는 두 가지가 남는다. 유출이 의심되면 `gptBridge.regenerateToken`,
+쓰지 않을 때는 서버를 내려 두는 것.
+
+---
+
+## ChatGPT 연동 완료 (2026-08-07~08) ✅
+
+Phase 3의 완료 기준이었던 "실제 ChatGPT Developer Mode에 커넥터 등록 후 동작"이
+충족됐다. 다만 **경로가 기획안과 다르다.**
+
+### cloudflared 대신 OpenAI Secure MCP Tunnel
+
+기획안 §6은 확장이 `cloudflared`를 띄워 공개 URL을 얻는 구조였다. 그 사이
+OpenAI가 **Secure MCP Tunnel**(2026-05)을 내놓았고, 이쪽이 더 낫다.
+
+| | 기획안(cloudflare) | 실제 채택(C-T) |
+|---|---|---|
+| 공개 URL | 생김 | **안 생김** (나가는 연결만) |
+| 토큰 위치 | ChatGPT 커넥터 설정 | **PC 밖으로 안 나감** |
+| URL 변동 | 재시작마다 바뀜 (§10-5) | 고정 |
+| 확장 설정 | `provider: cloudflare` | `provider: none` |
+
+**확장 코드는 한 줄도 고치지 않았다.** ChatGPT의 커넥터 인증 선택지가
+`OAuth`/`인증없음`/`혼합` 뿐이라 Bearer를 보낼 방법이 없는데, `tunnel-client`의
+`mcp.extra_headers` 가 로컬로 넘길 때 대신 붙여 준다. 그래서 §5.1의 Bearer 검사가
+그대로 살아 있다.
+
+인증은 반드시 **`인증없음`** 을 골라야 한다. 커넥터가 보낸 헤더가 정적 헤더를
+덮어쓰므로, `OAuth`·`혼합`을 고르면 ChatGPT의 `Authorization`이 우리 Bearer를
+밀어내고 401이 된다.
+
+### 부수적으로 확인된 것
+
+- **OpenAI 터널은 내부적으로 cloudflared를 쓴다.** `tunnel-client` 배포물에
+  `cloudflared.exe`(2026.7.2)와 매니페스트가 들어 있다. 우리가 핀 고정한
+  2026.7.3과 거의 같은 버전이다. §6.1에서 파악해 둔 지식이 그대로 통했다.
+- **Developer Mode가 무료 계정에서 동작한다.** §10-1이 "Plus 이상"이라고 적었으나
+  실제로는 무료 계정에서 커넥터 등록과 툴 호출까지 됐다. → §10-1 정정.
+- **비용 청구는 없었다.** 터널 생성·클라이언트 다운로드·실제 연결까지. 다만
+  OpenAI가 가격을 공개하지 않아 확정은 아니다.
+
+### 설치 절차는 별도 문서로
+
+[`TUNNEL_SETUP.md`](./TUNNEL_SETUP.md)에 다른 PC에서 재현할 수 있게 정리했다.
+로컬 절대 경로를 넣지 않고 플레이스홀더로 썼다.
+
+---
+
 ## 남은 검증
 
-[`VERIFICATION.md`](./VERIFICATION.md)의 **C단계(터널·ChatGPT 연동)** 와
-**E-8~E-12(패키징)** 가 남았다. 그 외에 B-P1, E-7이 미확인이다.
+A·B·C·D·E·G 전 구간이 통과했다. 남은 것은 곁가지 4개뿐이다.
+
+| 항목 | 내용 |
+|---|---|
+| G-10 · G-11 | 검색 절단 안내(08-07 수정분) 실측 |
+| B-P1 | 포트 충돌 시 오류 알림 + `설정 열기` 버튼 |
+| E-7 | 감사 로그 `detail` 500자 절삭 — 현재 경로로는 도달하지 않는다 |
+
+기획안 §8의 Phase 1~6 완료 기준은 모두 충족됐다.

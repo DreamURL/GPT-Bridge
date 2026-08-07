@@ -11,12 +11,18 @@ Ctrl+Z로 되돌릴 수 있고, Ctrl+S 전까지 디스크는 그대로입니다
 - 설계 문서: [`project.md`](./project.md)
 - 진행 상황: [`PROGRESS.md`](./PROGRESS.md)
 - **직접 확인할 항목: [`VERIFICATION.md`](./VERIFICATION.md)**
+- **ChatGPT 연동 설치: [`TUNNEL_SETUP.md`](./TUNNEL_SETUP.md)** — 다른 PC에서 재현할 때
 
 Phase 1~6 코드가 모두 구현되어 있고 자동 테스트 159개가 통과합니다.
 
-Windows에서 A·B·D·E(감사 로그) 구간을 직접 검증했습니다 — 버퍼 편집,
-Ctrl+Z 복구, 승인 거부·만료, CRLF 매칭, 경로 차단까지 전부 통과했습니다.
-**남은 것은 터널·ChatGPT 연동(C)과 `.vsix` 패키징(E-8~E-12)입니다.**
+Windows에서 전 구간을 직접 검증했습니다 — 버퍼 편집, Ctrl+Z 복구, 승인 거부·만료,
+CRLF 매칭, 경로 차단, `.vsix` 패키징, 그리고 **ChatGPT 실연동**까지 통과했습니다.
+
+연동은 기획안의 cloudflare 대신 **OpenAI Secure MCP Tunnel**로 했습니다. 공개
+URL이 생기지 않고 토큰이 PC를 벗어나지 않아 더 안전합니다. 확장 코드는 그대로이고
+`gptBridge.tunnel.provider`를 `none`으로 두면 됩니다. 절차는
+[`TUNNEL_SETUP.md`](./TUNNEL_SETUP.md)에 있습니다.
+
 자세한 현황은 [`VERIFICATION.md`](./VERIFICATION.md)에 있습니다.
 
 ## 개발

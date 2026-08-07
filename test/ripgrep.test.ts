@@ -163,6 +163,80 @@ describe('search', () => {
     assert.equal(outcome.truncated, true);
   });
 
+  /**
+   * 잘렸을 때 "얼마나 잘렸는지"를 알려 주지 못하면 모델은 범위를 좁힐 판단을
+   * 할 수 없다. "1건"과 "3건 중 1건"은 같은 상황이 아니다.
+   */
+  it('상한에 걸려도 전체 매치 수는 끝까지 센다', async () => {
+    const full = await rg.search(sandbox, {
+      query: 'needle',
+      isRegex: false,
+      include: 'src/**',
+      maxResults: 50,
+      contextLines: 0
+    });
+    assert.equal(full.truncation, 'none');
+    assert.equal(full.totalMatches, full.matchCount);
+    assert.ok(full.totalMatches >= 2, 'src 아래 needle이 2건 이상이어야 함');
+
+    const capped = await rg.search(sandbox, {
+      query: 'needle',
+      isRegex: false,
+      include: 'src/**',
+      maxResults: 1,
+      contextLines: 0
+    });
+
+    assert.equal(capped.matchCount, 1, '응답에 담기는 건수는 상한을 지켜야 함');
+    assert.equal(capped.totalMatches, full.totalMatches, '전체 건수는 상한과 무관해야 함');
+    assert.ok(capped.totalMatches > capped.matchCount);
+  });
+
+  it('상한으로 잘린 것은 truncation이 limit이다', async () => {
+    const outcome = await rg.search(sandbox, {
+      query: 'needle',
+      isRegex: false,
+      include: undefined,
+      maxResults: 1,
+      contextLines: 0
+    });
+    // 타임아웃·출력 초과와 구분되어야 한다. 해결책이 반대이기 때문이다.
+    assert.equal(outcome.truncation, 'limit');
+    assert.equal(outcome.truncated, true);
+  });
+
+  it('잘리지 않으면 truncation이 none이고 totalMatches가 matchCount와 같다', async () => {
+    const outcome = await rg.search(sandbox, {
+      query: 'needle',
+      isRegex: false,
+      include: undefined,
+      maxResults: 500,
+      contextLines: 0
+    });
+    assert.equal(outcome.truncation, 'none');
+    assert.equal(outcome.truncated, false);
+    assert.equal(outcome.totalMatches, outcome.matchCount);
+  });
+
+  it('상한 500까지 한 번에 받을 수 있다', async () => {
+    const many = path.join(sandbox, 'src', 'many.ts');
+    await fs.writeFile(many, Array.from({ length: 300 }, (_, i) => `const needle${i} = ${i};`).join('\n'));
+    try {
+      const outcome = await rg.search(sandbox, {
+        query: 'needle',
+        isRegex: false,
+        include: 'src/many.ts',
+        maxResults: 500,
+        contextLines: 0
+      });
+      assert.equal(outcome.matchCount, 300);
+      assert.equal(outcome.totalMatches, 300);
+      assert.equal(outcome.truncation, 'none');
+    } finally {
+      await fs.rm(many, { force: true });
+    }
+  });
+
   it('contextLines 0이면 매치 줄만 반환한다 (컨텍스트 절약)', async () => {
     const outcome = await rg.search(sandbox, {
       query: 'needle',

@@ -48,9 +48,18 @@ export function resolveRgPath(extensionPath?: string): string | undefined {
 
 export class RipgrepError extends Error {}
 
+/**
+ * rg를 중간에 끊은 이유. 'none'이면 프로세스가 끝까지 돌았다.
+ *
+ * 원인을 구분하는 이유는 **해결책이 반대**이기 때문이다. 결과 수 상한은
+ * max_results를 올리면 풀리지만, 타임아웃·출력 초과는 올릴수록 악화된다.
+ * 하나의 boolean으로 뭉치면 툴이 틀린 조언을 하게 된다.
+ */
+export type RunTruncation = 'none' | 'timeout' | 'output';
+
 interface RunResult {
   readonly stdout: string;
-  readonly truncated: boolean;
+  readonly truncation: RunTruncation;
 }
 
 /**
@@ -71,7 +80,7 @@ function run(
 
     const chunks: Buffer[] = [];
     let size = 0;
-    let truncated = false;
+    let truncation: RunTruncation = 'none';
     let settled = false;
 
     const finish = (fn: () => void): void => {
@@ -84,14 +93,14 @@ function run(
     };
 
     const timer = setTimeout(() => {
-      truncated = true;
+      truncation = 'timeout';
       child.kill('SIGKILL');
     }, timeoutMs);
 
     child.stdout.on('data', (chunk: Buffer) => {
       size += chunk.length;
       if (size > MAX_STDOUT_BYTES) {
-        truncated = true;
+        truncation = 'output';
         child.kill('SIGKILL');
         return;
       }
@@ -113,7 +122,7 @@ function run(
           reject(new RipgrepError(`ripgrep이 코드 ${code}로 종료했습니다`));
           return;
         }
-        resolve({ stdout: Buffer.concat(chunks).toString('utf8'), truncated });
+        resolve({ stdout: Buffer.concat(chunks).toString('utf8'), truncation });
       });
     });
   });
@@ -164,9 +173,24 @@ export interface SearchOptions {
   readonly contextLines: number;
 }
 
+/** 검색이 잘린 이유. 'limit'은 maxResults 상한, 나머지는 rg를 끊은 경우. */
+export type SearchTruncation = 'none' | 'limit' | 'timeout' | 'output';
+
 export interface SearchOutcome {
   readonly blocks: readonly SearchBlock[];
+  /** 응답에 담은 매치 수. `maxResults`를 넘지 않는다. */
   readonly matchCount: number;
+  /**
+   * rg가 내놓은 전체 매치 수. 상한을 넘어도 계속 센다 — 모델이 **얼마나 못
+   * 봤는지**를 알아야 범위를 좁힐지 판단할 수 있기 때문이다. "50건"과
+   * "1000건 중 50건"은 같은 상황이 아니다.
+   *
+   * 단 `truncation`이 'timeout'·'output'이면 rg를 중간에 끊은 것이라 이 값도
+   * 하한이다. 그 이상이 있을 수 있다.
+   */
+  readonly totalMatches: number;
+  readonly truncation: SearchTruncation;
+  /** `truncation !== 'none'`의 축약. */
   readonly truncated: boolean;
 }
 
@@ -205,10 +229,10 @@ export class Ripgrep {
       target
     ];
 
-    const { stdout, truncated } = await run(this.binPath, args, root, LIST_TIMEOUT_MS);
+    const { stdout, truncation } = await run(this.binPath, args, root, LIST_TIMEOUT_MS);
 
     const files: string[] = [];
-    let overflow = truncated;
+    let overflow = truncation !== 'none';
 
     for (const line of stdout.split('\n')) {
       if (line.length === 0) {
@@ -251,20 +275,21 @@ export class Ripgrep {
     // '-e'로 패턴을 명시한다. 이게 없으면 '--foo' 같은 질의가 rg 옵션으로 해석된다.
     args.push('-e', options.query, '--', root);
 
-    const { stdout, truncated } = await run(this.binPath, args, root, SEARCH_TIMEOUT_MS);
-    return this.parseSearchOutput(stdout, root, options.maxResults, truncated);
+    const { stdout, truncation } = await run(this.binPath, args, root, SEARCH_TIMEOUT_MS);
+    return this.parseSearchOutput(stdout, root, options.maxResults, truncation);
   }
 
   private parseSearchOutput(
     stdout: string,
     root: string,
     maxResults: number,
-    timedOut: boolean
+    runTruncation: RunTruncation
   ): SearchOutcome {
     const blocks: SearchBlock[] = [];
     let current: { path: string; lines: SearchLine[] } | undefined;
     let matchCount = 0;
-    let overflow = timedOut;
+    let totalMatches = 0;
+    let limitHit = false;
 
     const flush = (): void => {
       if (current !== undefined && current.lines.length > 0) {
@@ -313,8 +338,12 @@ export class Ripgrep {
       }
 
       if (type === 'match') {
+        // 상한을 넘어도 세는 것은 멈추지 않는다. rg에 --max-count를 주지
+        // 않으므로 stdout에는 이미 전체 매치가 들어 있고, 세는 비용은 없다.
+        // 여기서 멈추면 툴이 "얼마나 잘렸는지" 말해 줄 방법이 사라진다.
+        totalMatches += 1;
         if (matchCount >= maxResults) {
-          overflow = true;
+          limitHit = true;
           continue;
         }
         matchCount += 1;
@@ -333,6 +362,19 @@ export class Ripgrep {
 
     // 매치가 상한에 걸린 뒤에도 컨텍스트만 담긴 블록이 남을 수 있다.
     const meaningful = blocks.filter((block) => block.lines.some((line) => line.isMatch));
-    return { blocks: meaningful, matchCount, truncated: overflow };
+
+    // rg를 중간에 끊었다면 그쪽을 원인으로 삼는다. 상한은 우리가 고른 값이라
+    // 되돌릴 수 있지만, 타임아웃·출력 초과는 데이터 자체가 불완전하다는 뜻이라
+    // 사용자에게 알려야 할 사실이 다르다.
+    const truncation: SearchTruncation =
+      runTruncation !== 'none' ? runTruncation : limitHit ? 'limit' : 'none';
+
+    return {
+      blocks: meaningful,
+      matchCount,
+      totalMatches,
+      truncation,
+      truncated: truncation !== 'none'
+    };
   }
 }
