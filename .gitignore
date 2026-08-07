@@ -9,3 +9,14 @@ out-test/
 # 83MB(cloudflared.exe 포함)라 커밋하면 저장소가 못 쓰게 된다.
 tunnel-client-*/
 tunnel-client-*.zip
+
+# 내부 작업 문서. 설계·진행·검증 기록은 공개하지 않는다.
+# README.<언어>.md 와 TUNNEL_SETUP.md 는 사용자용이라 공개 대상이다.
+project.md
+PROGRESS.md
+VERIFICATION.md
+
+# 검증용 테스트. 저장소에 올리지 않는다.
+# 주의: npm run setup(빌드+설치)은 테스트를 거치지 않으므로 영향이 없지만,
+# clone한 기기에서는 npm test / npm run compile 을 쓸 수 없다.
+test/

@@ -1,0 +1,264 @@
+<div align="right">
+  <a href="README.md">한국어</a> ·
+  <a href="README.en.md">English</a> ·
+  <b>日本語</b> ·
+  <a href="README.zh-CN.md">简体中文</a>
+</div>
+
+# GPT Bridge
+
+現在の VS Code ワークスペースを MCP サーバーとして公開し、
+**ChatGPT が自分のコードを直接読み書きできるようにする**拡張機能です。
+
+> **中核となる原則 — GPT のテキスト編集はディスクではなくエディタのバッファに適用されます。**
+> `Ctrl+Z` で取り消せますし、`Ctrl+S` を押すまでディスクは変わりません。
+> ただしファイルの作成・削除・リネームは例外で、承認した時点でディスクに反映されます。
+
+## できること
+
+| 読み取り | 書き込み（承認が必要） |
+|---|---|
+| `get_workspace_info` ワークスペース概要 | `edit_file` 部分編集 ← 主力 |
+| `list_directory` ファイル一覧 | `write_file` 新規作成・全体置換 |
+| `read_file` ファイル読み取り | `create_directory` フォルダ作成 |
+| `search_text` テキスト検索 | `delete_path` 削除（常に確認） |
+| `get_diagnostics` 型・Lint エラー | `save_file` 保存 |
+
+`get_diagnostics` がこの拡張機能の差別化点です。GPT が型エラーを自分で読んで
+修正できます。一覧と検索は `.gitignore` を尊重します。
+
+---
+
+## インストール
+
+必要なもの: [Git](https://git-scm.com/downloads)、
+[Node.js](https://nodejs.org/)（LTS）、[VS Code](https://code.visualstudio.com/) 1.90 以上。
+
+```bash
+git clone https://github.com/DreamURL/vscodeconnector.git
+cd vscodeconnector
+npm install
+npm run setup
+```
+
+`npm run setup` が `.vsix` のビルドと VS Code へのインストールをまとめて行います。
+完了したら VS Code で `Ctrl+Shift+P` → **`Developer: Reload Window`** を実行してください。
+左のアクティビティバーに GPT Bridge のアイコンが現れます。
+
+> `cd vscodeconnector` が必要な理由 — `git clone` はリポジトリ名の
+> **フォルダを新しく作り**、その中にファイルを配置します。コマンドが終わっても
+> 自分がいる場所は外側なので、そのフォルダに入らないと `npm install` が正しく動きません。
+
+**更新するとき**は `git pull && npm install && npm run setup`。
+
+### `code` コマンドが見つからないと表示されたら
+
+ビルドは成功しており、インストールだけが失敗した状態です。VS Code の画面から
+直接追加できます。
+
+1. 左の**拡張機能**アイコン → 右上の `...` → **VSIX からのインストール**
+2. リポジトリフォルダの `gpt-bridge-0.1.0.vsix` を選択
+
+`code` コマンドを使いたい場合は `Ctrl+Shift+P` →
+`Shell Command: Install 'code' command in PATH` を実行しておいてください。
+
+> ⚠️ **他の PC から `.vsix` をコピーして持ち込まないでください。** ファイル検索に使う
+> ripgrep は OS・CPU ごとに別のファイルなので、別の環境でビルドした `.vsix` では
+> 検索と一覧が**何のエラーも出さずに機能しなくなります。** 各マシンで上記 4 行を
+> 実行してビルドしてください。
+
+---
+
+## ChatGPT との接続
+
+ChatGPT はインターネット上にあり、コードは自分の PC の中にあります。外から入って
+くることはできないので、**逆に**します — 自分の PC から OpenAI に電話をかけ、
+その回線をつないだままにしておくのです。
+
+```
+ChatGPT ──(認証: なし)──▶ OpenAI トンネル ◀──(外向き接続)── tunnel-client（自分の PC）
+                                                                │ Authorization を付与
+                                                                ▼
+                                                     127.0.0.1:3737  GPT Bridge
+```
+
+公開アドレスは作られず、**トークンが PC の外に出ることもありません。**
+
+以下は要約です。画面ごとの詳しい手順とトラブルシューティングは
+[`TUNNEL_SETUP.md`](./TUNNEL_SETUP.md) にあります。
+
+### 1. トンネルを作る
+
+[platform.openai.com → Tunnels](https://platform.openai.com/settings/organization/tunnels)
+→ **Create tunnel**。名前と説明はどちらも必須です。
+`tunnel_` で始まる ID を控えておいてください。
+
+### 2. API キーを発行する
+
+[API keys](https://platform.openai.com/settings/organization/api-keys) →
+**Create new secret key**。権限に **Tunnels** の項目があれば **Read + Use** を
+有効にします。`sk-` で始まる値を控えてください — **表示されるのは一度きりです。**
+
+### 3. tunnel-client をダウンロードする
+
+[リリースページ](https://github.com/openai/tunnel-client/releases)から自分の OS 用の
+zip を 1 つだけ取得します（Windows なら多くの場合 `windows-amd64`）。
+
+**実行する前にハッシュを確認してください。** 同じページの `SHA256SUMS.txt` と
+照合します。
+
+```powershell
+# Windows
+certutil -hashfile "<zip のパス>" SHA256
+```
+```bash
+# macOS / Linux
+shasum -a 256 "<zip のパス>"
+```
+
+値が違ったら中断してください。展開先は**リポジトリの外**であればどこでも構いません。
+
+### 4. 設定ファイルを作る
+
+`%APPDATA%\tunnel-client\gpt-bridge.yaml`
+（macOS・Linux は `~/.config/tunnel-client/gpt-bridge.yaml`）
+
+```yaml
+config_version: 1
+
+control_plane:
+  base_url: "https://api.openai.com"
+  tunnel_id: "ここにトンネル ID"
+  api_key: "ここに OpenAI キー"
+
+health:
+  listen_addr: "127.0.0.1:8080"
+
+log:
+  level: warn
+
+mcp:
+  server_urls:
+    - channel: main
+      url: "http://127.0.0.1:3737/mcp"
+
+  # GPT Bridge はすべてのリクエストに Authorization ヘッダーを要求する。
+  # ChatGPT にはこれを送る手段がないため、ここで代わりに付与する。
+  extra_headers:
+    Authorization: "Bearer ここに 64 文字のトークン"
+```
+
+> YAML はインデントで構造を判断します。**タブではなくスペース**を使い、行頭の
+> 空白は変更しないでください。Windows のメモ帳で保存する際は、ファイルの種類を
+> **すべてのファイル**にしないと `gpt-bridge.yaml.txt` になってしまいます。
+
+### 5. トークンを取得して記入する
+
+VS Code で作業するフォルダを開いてから:
+
+1. `Ctrl+,` → `gptBridge.tunnel.provider` → **`none`**
+   （拡張機能が独自のトンネルを起動しないようにします）
+2. `Ctrl+Shift+P` → **`GPT Bridge: 서버 시작`**（サーバー開始）
+3. `Ctrl+Shift+P` → **`GPT Bridge: 인증 토큰 복사`**（認証トークンをコピー）
+
+コピーした 64 文字を、上の設定の `Bearer` の**後ろ**に貼り付けます。
+`Bearer` + 半角スペース 1 つ + トークンです。
+
+### 6. トンネルを起動する
+
+```bash
+tunnel-client doctor --profile gpt-bridge --explain   # 設定を点検
+tunnel-client run --profile gpt-bridge                # 起動（ウィンドウは開いたまま）
+```
+
+状態確認: <http://127.0.0.1:8080/ui>
+
+### 7. ChatGPT にコネクタを登録する
+
+**トンネルが動いている間に**行ってください。
+
+1. ChatGPT → 設定 → **Apps & Connectors** → **Advanced** → **Developer Mode** を有効化
+2. コネクタを追加 → `接続`: **トンネル** → 作成したトンネルを選択
+3. `認証`: **なし** ← **必ずこれを選んでください**
+
+> **なぜ「なし」なのか** — コネクタが転送するヘッダーは最後に適用され、静的な
+> ヘッダーを**上書きします。** `OAuth` や `混合` を選ぶと ChatGPT 側の
+> `Authorization` が、こちらで注入した Bearer を押しのけて 401 になります。
+
+### 8. 指示文を設定する
+
+`Ctrl+Shift+P` → **`GPT Bridge: ChatGPT 지침 복사`**（ChatGPT 指示をコピー）を実行し、
+ChatGPT に貼り付けます。
+
+**事実上必須です。** GPT は明示的に指示されない限り、カスタムツールをあまり
+呼び出しません。貼り付け先は 3 か所あり、適用範囲が異なります。
+
+| 場所 | 範囲 |
+|---|---|
+| **プロジェクトの指示** ← 推奨 | そのプロジェクト内の会話のみ |
+| グローバルのカスタム指示 | すべての会話 — 無関係な会話でもツールを呼ぼうとします |
+| 会話の最初のメッセージ | その会話のみ |
+
+### 毎回の起動手順
+
+1. VS Code → `GPT Bridge: 서버 시작`
+2. `tunnel-client run --profile gpt-bridge`
+
+---
+
+## セキュリティ
+
+ローカルのファイルシステムを外部の AI に開く道具です。防御は次のとおりです。
+
+- **パスの関門** — すべてのファイルアクセスが単一の検証を通過します。ワークスペース
+  外への脱出、シンボリックリンクによる迂回、そして Windows 固有の回避手段
+  （代替データストリーム `.env::$DATA`、予約デバイス名 `CON`、ドライブ相対パス）を
+  遮断します。区切り文字は `/` のみ受け付けます。
+- **拒否リスト** — `.git/**`、`.env*`、`*.pem`、`*.key`、`id_rsa*`、`.ssh/**`、
+  `.aws/**`、`.npmrc`、`.netrc` など。追加はできますが削除はできません。
+- **承認ゲート** — 書き込みは確認を求めます。同時リクエストは直列化されるため
+  プロンプトが重なることはありません。90 秒無応答は拒否として扱われ、
+  **期限切れ後に押した選択は破棄されます。** `delete_path` はどのモードでも常に確認します。
+- **認証** — 32 バイトのランダムな Bearer トークン、`127.0.0.1` にバインド、CORS 無効。
+- **監査ログ** — ツール呼び出しだけでなく、遮断・拒否・期限切れ・認証失敗も
+  JSONL で記録します。
+
+トークンが漏れればワークスペース全体が開きます。これは受け入れた前提であり、
+対応は `GPT Bridge: 토큰 재발급`（トークン再発行）です。再発行したら設定ファイルの
+`Authorization` も併せて更新してください。
+
+## 設定
+
+| 項目 | 既定値 | 説明 |
+|---|---|---|
+| `gptBridge.port` | `3737` | サーバーのポート |
+| `gptBridge.autoStart` | `false` | VS Code 起動時に自動実行 |
+| `gptBridge.tunnel.provider` | `cloudflare` | 外部トンネル使用時は `none` |
+| `gptBridge.approval.mode` | `always` | `always` / `session` / `pattern` |
+| `gptBridge.autoSave` | `false` | 無効のままなら `Ctrl+S` までディスクは安全 |
+| `gptBridge.maxReadBytes` | `1048576` | 一度に読む最大バイト数 |
+
+## 既知の制約
+
+1. PC とトンネルが動いている間だけ機能します。
+2. 書き込みは ChatGPT 側と拡張機能側の両方で確認され、**2 段階**になります。
+3. `.vsix` には**ビルドしたマシンのプラットフォーム用 ripgrep のみ**が含まれます。
+4. ワークスペースが git リポジトリでない場合、`.gitignore` は適用されません。
+5. マルチルートワークスペースは最初のフォルダのみが対象です。
+6. ターミナル実行や Git 操作のツールは提供しません。
+7. **「保存するまでディスクは安全」はテキスト編集のみに当てはまります。**
+
+## 開発
+
+```bash
+npm run typecheck   # tsc --noEmit
+npm run build       # esbuild → dist/extension.js
+npm run watch       # 変更監視
+npm run package     # .vsix の生成のみ
+```
+
+VS Code でこのフォルダを開き `F5` を押すと拡張機能開発ホストが起動します。
+
+## ライセンス
+
+MIT
