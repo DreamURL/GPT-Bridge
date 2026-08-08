@@ -87,6 +87,15 @@ ChatGPT ──(認証: なし)──▶ OpenAI トンネル ◀──(外向き�
 以下は要約です。画面ごとの詳しい手順とトラブルシューティングは
 [`TUNNEL_SETUP.md`](./TUNNEL_SETUP.md) にあります。
 
+**まず 3 つの値を集め、5 のステップで設定ファイルに一度でまとめて記入します。**
+メモ帳などに控えておいてください。
+
+| 値 | どこで手に入るか |
+|---|---|
+| トンネル ID（`tunnel_...`） | 1 |
+| OpenAI API キー（`sk-...`） | 2 |
+| GPT Bridge トークン（64 文字） | 3 |
+
 ### 1. トンネルを作る
 
 [platform.openai.com → Tunnels](https://platform.openai.com/settings/organization/tunnels)
@@ -103,7 +112,20 @@ ChatGPT ──(認証: なし)──▶ OpenAI トンネル ◀──(外向き�
 > **この用途専用のキーを発行してください。** 他で使っているキーを流用すると、
 > 後で破棄する際にそちらまで一緒に止まります。
 
-### 3. tunnel-client をダウンロードする
+### 3. GPT Bridge のトークンをコピーする
+
+VS Code で**作業するフォルダを開いてから**:
+
+1. `Ctrl+,` → `gptBridge.tunnel.provider` を検索 → **`none`** に変更
+   （拡張機能が独自のトンネルを起動しないようにします）
+2. `Ctrl+Shift+P` → **`GPT Bridge: 서버 시작`**（サーバー開始）
+3. `Ctrl+Shift+P` → **`GPT Bridge: 인증 토큰 복사`**（認証トークンをコピー）
+
+64 文字の文字列がクリップボードに入ります。**控えておいてください。**
+
+これで 3 つの値がそろいました。
+
+### 4. tunnel-client をダウンロードする
 
 [リリースページ](https://github.com/openai/tunnel-client/releases)から自分の OS 用の
 zip を 1 つだけ取得します（Windows なら多くの場合 `windows-amd64`）。
@@ -129,7 +151,10 @@ shasum -a 256 "~/Downloads/tunnel-client-v0.0.11-windows-amd64.zip"
 
 値が違ったら中断してください。一致したら**リポジトリの外**の任意のフォルダに展開します。
 
-### 4. 設定ファイルを作る
+### 5. 設定ファイルを作る
+
+**先に集めた 3 つの値を、ここで一度にすべて記入します。** 後で開き直さずに済むよう
+今すべて入れてください。
 
 **まずフォルダを自分で作成します。** `tunnel-client` をまだ一度も実行していないため、
 何も用意されていません。
@@ -161,8 +186,12 @@ config_version: 1
 
 control_plane:
   base_url: "https://api.openai.com"
-  tunnel_id: "ここにトンネル ID"
-  api_key: "ここに OpenAI キー"
+
+  # 1 のトンネル ID。"tunnel_" の接頭辞ごとそのまま貼り付けます。
+  tunnel_id: "tunnel_0123456789abcdef0123456789abcdef"
+
+  # 2 の API キー。"sk-" で始まる文字列すべてです。
+  api_key: "sk-proj-AbCdEf0123456789...(中略)...WxYz"
 
 health:
   listen_addr: "127.0.0.1:8080"
@@ -178,24 +207,25 @@ mcp:
   # GPT Bridge はすべてのリクエストに Authorization ヘッダーを要求する。
   # ChatGPT にはこれを送る手段がないため、ここで代わりに付与する。
   extra_headers:
-    Authorization: "Bearer ここに 64 文字のトークン"
+    # 3 の 64 文字トークン。"Bearer" と半角スペース 1 つは残し、その後ろだけ置き換えます。
+    Authorization: "Bearer 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 ```
 
+> 上の 3 つの値は**形を示すための例**です。そのままでは動きません。
+
+集めた値に置き換えてください。**引用符はそのまま残します。**
+
+| 項目 | 形式 | 注意 |
+|---|---|---|
+| `tunnel_id` | `tunnel_` + 16 進数 32 文字 | **`tunnel_` を含めて**丸ごと。数字だけではいけません |
+| `api_key` | `sk-` または `sk-proj-` で始まる | 発行画面に出た文字列**すべて** |
+| `Authorization` | `Bearer ` + 16 進数 64 文字 | **`Bearer` と半角スペース 1 つは残し**、その後ろだけ置換 |
+
+> ⚠️ **`Bearer` を消さないでください。** `Bearer` + 半角スペース 1 つ + トークンです。
+> 抜けると接続はできても全リクエストが 401 で拒否されます。
+>
 > YAML はインデントで構造を判断します。**タブではなくスペース**を使い、行頭の
-> 空白は変更しないでください。Windows のメモ帳で保存する際は、ファイルの種類を
-> **すべてのファイル**にしないと `gpt-bridge.yaml.txt` になってしまいます。
-
-### 5. トークンを取得して記入する
-
-VS Code で作業するフォルダを開いてから:
-
-1. `Ctrl+,` → `gptBridge.tunnel.provider` → **`none`**
-   （拡張機能が独自のトンネルを起動しないようにします）
-2. `Ctrl+Shift+P` → **`GPT Bridge: 서버 시작`**（サーバー開始）
-3. `Ctrl+Shift+P` → **`GPT Bridge: 인증 토큰 복사`**（認証トークンをコピー）
-
-コピーした 64 文字を、上の設定の `Bearer` の**後ろ**に貼り付けます。
-`Bearer` + 半角スペース 1 つ + トークンです。
+> 空白は変更しないでください。
 
 ### 6. トンネルを起動する
 

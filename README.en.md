@@ -86,6 +86,15 @@ No public address is created and **the token never leaves your machine.**
 What follows is a summary. Screen-by-screen steps and troubleshooting live in
 [`TUNNEL_SETUP.md`](./TUNNEL_SETUP.md).
 
+**Collect three values first, then fill them into the config file in one pass
+at step 5.** Keep them in a scratch file.
+
+| Value | Comes from |
+|---|---|
+| Tunnel ID (`tunnel_...`) | Step 1 |
+| OpenAI API key (`sk-...`) | Step 2 |
+| GPT Bridge token (64 chars) | Step 3 |
+
 ### 1. Create a tunnel
 
 [platform.openai.com → Tunnels](https://platform.openai.com/settings/organization/tunnels)
@@ -102,7 +111,20 @@ tunnel-specific scope. Copy the `sk-` value — **it is shown only once.**
 > process. **Issue a key dedicated to this purpose.** Reusing a key from
 > somewhere else means revoking it later breaks that other thing too.
 
-### 3. Download tunnel-client
+### 3. Copy the GPT Bridge token
+
+In VS Code, **open the folder you want to work in**, then:
+
+1. `Ctrl+,` → search `gptBridge.tunnel.provider` → set it to **`none`**
+   (stops the extension from starting a tunnel of its own)
+2. `Ctrl+Shift+P` → **`GPT Bridge: 서버 시작`** (Start server)
+3. `Ctrl+Shift+P` → **`GPT Bridge: 인증 토큰 복사`** (Copy auth token)
+
+A 64-character string lands on your clipboard. **Write it down.**
+
+That is all three values.
+
+### 4. Download tunnel-client
 
 Grab the single zip for your OS from the
 [releases page](https://github.com/openai/tunnel-client/releases)
@@ -128,7 +150,10 @@ shasum -a 256 "~/Downloads/tunnel-client-v0.0.11-windows-amd64.zip"
 
 Stop if the values differ. If they match, extract anywhere **outside the repository**.
 
-### 4. Write the config file
+### 5. Write the config file
+
+**Fill in all three values you collected, here, in one pass.** Do it now so you
+never have to reopen this file.
 
 **Create the folder yourself first.** `tunnel-client` has never run, so nothing
 exists yet.
@@ -159,8 +184,12 @@ config_version: 1
 
 control_plane:
   base_url: "https://api.openai.com"
-  tunnel_id: "YOUR_TUNNEL_ID"
-  api_key: "YOUR_OPENAI_KEY"
+
+  # Tunnel ID from step 1. Paste it whole, including the "tunnel_" prefix.
+  tunnel_id: "tunnel_0123456789abcdef0123456789abcdef"
+
+  # API key from step 2. The entire string starting with "sk-".
+  api_key: "sk-proj-AbCdEf0123456789...(truncated)...WxYz"
 
 health:
   listen_addr: "127.0.0.1:8080"
@@ -176,24 +205,25 @@ mcp:
   # GPT Bridge requires an Authorization header on every request.
   # ChatGPT has no way to send one, so we attach it here instead.
   extra_headers:
-    Authorization: "Bearer YOUR_64_CHAR_TOKEN"
+    # 64-char token from step 3. Keep "Bearer" and the single space; replace only what follows.
+    Authorization: "Bearer 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 ```
 
+> The three values above are **shape examples**. Left as-is, nothing will work.
+
+Replace them with what you collected. **Keep the quotation marks.**
+
+| Field | Shape | Watch out |
+|---|---|---|
+| `tunnel_id` | `tunnel_` + 32 hex chars | Include the **`tunnel_` prefix** — not just the digits |
+| `api_key` | starts with `sk-` or `sk-proj-` | The **entire** string shown at creation |
+| `Authorization` | `Bearer ` + 64 hex chars | Keep **`Bearer` and the single space**; replace only what follows |
+
+> ⚠️ **Do not delete `Bearer`.** It is `Bearer`, one space, then the token.
+> Drop it and the tunnel connects but every request is rejected with 401.
+>
 > YAML derives structure from indentation. Use **spaces, not tabs**, and leave
-> the leading whitespace alone. On Windows Notepad, set the file type to
-> **All Files** or you will end up with `gpt-bridge.yaml.txt`.
-
-### 5. Get the token and fill it in
-
-Open your working folder in VS Code, then:
-
-1. `Ctrl+,` → `gptBridge.tunnel.provider` → **`none`**
-   (stops the extension from starting a tunnel of its own)
-2. `Ctrl+Shift+P` → **`GPT Bridge: 서버 시작`** (Start server)
-3. `Ctrl+Shift+P` → **`GPT Bridge: 인증 토큰 복사`** (Copy auth token)
-
-Paste the 64-character value **after** `Bearer` in the config above —
-`Bearer`, one space, then the token.
+> the leading whitespace alone.
 
 ### 6. Run the tunnel
 

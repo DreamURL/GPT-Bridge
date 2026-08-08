@@ -84,6 +84,15 @@ ChatGPT ──(인증: 없음)──▶ OpenAI 터널 ◀──(나가는 연결
 아래는 요약입니다. 화면별 자세한 절차와 문제 해결은
 [`TUNNEL_SETUP.md`](./TUNNEL_SETUP.md)에 있습니다.
 
+**먼저 값 세 개를 모으고, 5단계에서 설정 파일에 한 번에 넣습니다.**
+메모장에 적어 두세요.
+
+| 값 | 어디서 나오나 |
+|---|---|
+| 터널 ID (`tunnel_...`) | 1단계 |
+| OpenAI API 키 (`sk-...`) | 2단계 |
+| GPT Bridge 토큰 (64자) | 3단계 |
+
 ### 1. 터널 만들기
 
 [platform.openai.com → Tunnels](https://platform.openai.com/settings/organization/tunnels)
@@ -100,7 +109,20 @@ ChatGPT ──(인증: 없음)──▶ OpenAI 터널 ◀──(나가는 연결
 > **이 용도로만 쓰는 키를 따로 발급**하세요. 다른 데 쓰던 키를 재사용하면
 > 나중에 폐기할 때 그쪽까지 같이 끊깁니다.
 
-### 3. tunnel-client 내려받기
+### 3. GPT Bridge 토큰 복사
+
+VS Code에서 **작업할 폴더를 열고**:
+
+1. `Ctrl+,` → `gptBridge.tunnel.provider` 검색 → **`none`** 으로 변경
+   (확장이 자체 터널을 띄우지 않게 합니다)
+2. `Ctrl+Shift+P` → **`GPT Bridge: 서버 시작`**
+3. `Ctrl+Shift+P` → **`GPT Bridge: 인증 토큰 복사`**
+
+64자짜리 문자열이 클립보드에 들어갑니다. **적어 두세요.**
+
+이걸로 값 세 개가 다 모였습니다.
+
+### 4. tunnel-client 내려받기
 
 [릴리스 페이지](https://github.com/openai/tunnel-client/releases)에서 자기 OS용
 zip 하나만 받습니다 (Windows 대부분 `windows-amd64`).
@@ -125,7 +147,10 @@ shasum -a 256 "~/Downloads/tunnel-client-v0.0.11-windows-amd64.zip"
 
 값이 다르면 멈추세요. 같으면 **저장소 밖** 아무 폴더에나 압축을 풉니다.
 
-### 4. 설정 파일 만들기
+### 5. 설정 파일 만들기
+
+**앞에서 모은 값 세 개를 여기서 한 번에 채웁니다.** 나중에 다시 열 일이 없도록
+지금 전부 넣으세요.
 
 **폴더부터 직접 만들어야 합니다.** `tunnel-client`를 아직 실행한 적이 없어
 아무것도 만들어져 있지 않습니다.
@@ -156,8 +181,12 @@ config_version: 1
 
 control_plane:
   base_url: "https://api.openai.com"
-  tunnel_id: "여기에_터널ID"
-  api_key: "여기에_OpenAI키"
+
+  # 1단계의 터널 ID. "tunnel_" 접두사까지 통째로 붙여넣습니다.
+  tunnel_id: "tunnel_0123456789abcdef0123456789abcdef"
+
+  # 2단계의 API 키. "sk-" 로 시작하는 문자열 전체입니다.
+  api_key: "sk-proj-AbCdEf0123456789...(중략)...WxYz"
 
 health:
   listen_addr: "127.0.0.1:8080"
@@ -173,23 +202,25 @@ mcp:
   # GPT Bridge는 모든 요청에 Authorization 헤더를 요구한다.
   # ChatGPT는 이 헤더를 보낼 수단이 없으므로 여기서 대신 붙인다.
   extra_headers:
-    Authorization: "Bearer 여기에_64자토큰"
+    # 3단계의 64자 토큰. "Bearer" 와 공백 1칸은 그대로 두고 뒤만 바꿉니다.
+    Authorization: "Bearer 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 ```
 
-> YAML은 들여쓰기로 구조를 판단합니다. **탭이 아니라 스페이스**를 쓰고 여백을
-> 건드리지 마세요. 메모장으로 저장할 때 파일 형식을 **모든 파일**로 바꾸지 않으면
-> `gpt-bridge.yaml.txt`가 됩니다.
+> 위 세 값은 **모양을 보여 주는 예시**입니다. 그대로 두면 동작하지 않습니다.
 
-### 5. 토큰 얻어 채우기
+세 자리를 앞에서 모은 값으로 바꾸세요. **따옴표는 그대로 둡니다.**
 
-VS Code에서 작업할 폴더를 열고:
+| 자리 | 모양 | 주의 |
+|---|---|---|
+| `tunnel_id` | `tunnel_` + 16진수 32자 | **`tunnel_` 까지 포함**해 통째로 넣습니다. 숫자만 넣으면 안 됩니다 |
+| `api_key` | `sk-` 또는 `sk-proj-` 로 시작 | 발급 화면에 나온 문자열 **전체** |
+| `Authorization` | `Bearer ` + 16진수 64자 | **`Bearer` 와 공백 1칸은 남겨 두고** 그 뒤만 교체 |
 
-1. `Ctrl+,` → `gptBridge.tunnel.provider` → **`none`**
-   (확장이 자체 터널을 띄우지 않게 합니다)
-2. `Ctrl+Shift+P` → **`GPT Bridge: 서버 시작`**
-3. `Ctrl+Shift+P` → **`GPT Bridge: 인증 토큰 복사`**
-
-복사된 64자를 위 설정의 `Bearer` **뒤에** 붙입니다. `Bearer` + 공백 1칸 + 토큰.
+> ⚠️ **`Bearer`를 지우지 마세요.** `Bearer` + 공백 1칸 + 토큰입니다.
+> 빠지면 연결은 되는데 모든 요청이 401로 거부됩니다.
+>
+> YAML은 들여쓰기로 구조를 판단합니다. **탭이 아니라 스페이스**를 쓰고 줄 앞의
+> 여백을 건드리지 마세요.
 
 ### 6. 터널 실행
 

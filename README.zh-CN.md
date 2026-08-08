@@ -83,6 +83,14 @@ ChatGPT ──(认证：无)──▶ OpenAI 隧道 ◀──(出站连接)─�
 以下是摘要。逐屏的详细步骤和故障排查见
 [`TUNNEL_SETUP.md`](./TUNNEL_SETUP.md)。
 
+**先收集三个值，然后在第 5 步一次性填进配置文件。** 请先记在记事本里。
+
+| 值 | 来自 |
+|---|---|
+| 隧道 ID（`tunnel_...`） | 第 1 步 |
+| OpenAI API 密钥（`sk-...`） | 第 2 步 |
+| GPT Bridge 令牌（64 位） | 第 3 步 |
+
 ### 1. 创建隧道
 
 [platform.openai.com → Tunnels](https://platform.openai.com/settings/organization/tunnels)
@@ -98,7 +106,20 @@ ChatGPT ──(认证：无)──▶ OpenAI 隧道 ◀──(出站连接)─�
 > 这个密钥会以明文保存在配置文件里，并由常驻进程使用。
 > **请单独签发一个专用于此的密钥。** 复用其他地方的密钥，日后吊销时会把那边一起弄停。
 
-### 3. 下载 tunnel-client
+### 3. 复制 GPT Bridge 令牌
+
+在 VS Code 中**打开要工作的文件夹**，然后：
+
+1. `Ctrl+,` → 搜索 `gptBridge.tunnel.provider` → 改为 **`none`**
+   （让扩展不再自行启动隧道）
+2. `Ctrl+Shift+P` → **`GPT Bridge: 서버 시작`**（启动服务器）
+3. `Ctrl+Shift+P` → **`GPT Bridge: 인증 토큰 복사`**（复制认证令牌）
+
+剪贴板里会得到一个 64 位字符串。**请记下来。**
+
+至此三个值都齐了。
+
+### 4. 下载 tunnel-client
 
 在[发布页面](https://github.com/openai/tunnel-client/releases)只下载对应自己
 操作系统的那一个 zip（Windows 大多是 `windows-amd64`）。
@@ -123,7 +144,9 @@ shasum -a 256 "~/Downloads/tunnel-client-v0.0.11-windows-amd64.zip"
 
 数值不一致就停下。一致的话，解压到**仓库之外**的任意文件夹即可。
 
-### 4. 编写配置文件
+### 5. 编写配置文件
+
+**把前面收集的三个值在这里一次性填完。** 现在就填好，之后不必再打开这个文件。
 
 **先自己创建文件夹。** `tunnel-client` 还从未运行过，所以什么都还不存在。
 
@@ -153,8 +176,12 @@ config_version: 1
 
 control_plane:
   base_url: "https://api.openai.com"
-  tunnel_id: "这里填隧道 ID"
-  api_key: "这里填 OpenAI 密钥"
+
+  # 第 1 步的隧道 ID。连同 "tunnel_" 前缀整体粘贴。
+  tunnel_id: "tunnel_0123456789abcdef0123456789abcdef"
+
+  # 第 2 步的 API 密钥。以 "sk-" 开头的完整字符串。
+  api_key: "sk-proj-AbCdEf0123456789...(略)...WxYz"
 
 health:
   listen_addr: "127.0.0.1:8080"
@@ -170,24 +197,24 @@ mcp:
   # GPT Bridge 要求每个请求都带 Authorization 头。
   # ChatGPT 没有办法发送这个头，因此在这里代为附加。
   extra_headers:
-    Authorization: "Bearer 这里填 64 位令牌"
+    # 第 3 步的 64 位令牌。保留 "Bearer" 和一个空格，只替换后面的部分。
+    Authorization: "Bearer 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 ```
 
+> 上面三个值只是**用来展示格式的示例**，原样保留是无法运行的。
+
+请替换成你收集到的值。**引号请保留。**
+
+| 字段 | 格式 | 注意 |
+|---|---|---|
+| `tunnel_id` | `tunnel_` + 32 位十六进制 | 要**连 `tunnel_` 前缀一起**填，不能只填数字 |
+| `api_key` | 以 `sk-` 或 `sk-proj-` 开头 | 创建时显示的**完整**字符串 |
+| `Authorization` | `Bearer ` + 64 位十六进制 | **保留 `Bearer` 和一个空格**，只替换后面的部分 |
+
+> ⚠️ **不要删掉 `Bearer`。** 格式是 `Bearer` + 一个空格 + 令牌。
+> 少了它虽然能连上，但每个请求都会被 401 拒绝。
+>
 > YAML 依靠缩进判断结构。请使用**空格而非制表符**，不要改动行首的空白。
-> 在 Windows 记事本保存时，若不把文件类型改为**所有文件**，就会变成
-> `gpt-bridge.yaml.txt`。
-
-### 5. 取得令牌并填入
-
-在 VS Code 中打开要工作的文件夹，然后：
-
-1. `Ctrl+,` → `gptBridge.tunnel.provider` → **`none`**
-   （让扩展不再自行启动隧道）
-2. `Ctrl+Shift+P` → **`GPT Bridge: 서버 시작`**（启动服务器）
-3. `Ctrl+Shift+P` → **`GPT Bridge: 인증 토큰 복사`**（复制认证令牌）
-
-把复制到的 64 位字符串粘贴到上面配置中 `Bearer` 的**后面**：
-`Bearer` + 一个空格 + 令牌。
 
 ### 6. 运行隧道
 

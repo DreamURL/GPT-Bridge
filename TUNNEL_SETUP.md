@@ -55,7 +55,7 @@ ChatGPT의 커넥터 등록 화면에는 인증 선택지가 `OAuth` / `인증�
 |---|---|
 | 터널 ID (`tunnel_...`) | 2단계 |
 | OpenAI API 키 (`sk-...`) | 3단계 |
-| GPT Bridge 토큰 (64자) | 6단계 |
+| GPT Bridge 토큰 (64자) | 4단계 |
 
 ---
 
@@ -140,7 +140,25 @@ npm run setup
 
 ---
 
-## 4단계 🌐📁💻 — tunnel-client 내려받기
+## 4단계 🧩 — GPT Bridge 서버 켜고 토큰 얻기
+
+VS Code에서 **작업할 폴더를 연 창**에서 합니다.
+
+1. `Ctrl + ,` → `gptBridge.tunnel.provider` 검색 → **`none`** 으로 변경
+
+   > 기본값 `cloudflare`로 두면 확장이 자기 터널을 또 띄웁니다. OpenAI 터널을
+   > 쓸 때는 필요 없고, 공개 주소가 생겨 버려 오히려 손해입니다.
+
+2. `Ctrl + Shift + P` → **`GPT Bridge: 서버 시작`**
+3. `Ctrl + Shift + P` → **`GPT Bridge: 인증 토큰 복사`**
+
+64자짜리 문자열이 클립보드에 들어갑니다.
+
+이걸로 값 세 개가 다 모였습니다.
+
+---
+
+## 5단계 🌐📁💻 — tunnel-client 내려받기
 
 ### 받기 (브라우저)
 
@@ -194,7 +212,7 @@ zip 파일 **우클릭 → 압축 풀기**. 폴더는 어디든 상관없습니�
 
 ---
 
-## 5단계 📝 — 설정 파일 만들기
+## 6단계 📝 — 설정 파일 만들기
 
 `tunnel-client`가 읽을 설정 파일입니다. 메모장으로 직접 만듭니다.
 
@@ -221,15 +239,19 @@ C:\Users\<사용자이름>\AppData\Roaming
 
 ### 파일 만들기
 
-메모장을 열고 아래를 통째로 붙여넣습니다. **아직 값은 안 채워도 됩니다.**
+메모장을 열고 아래를 통째로 붙여넣은 뒤, **값 세 자리를 지금 모두 채웁니다.**
 
 ```yaml
 config_version: 1
 
 control_plane:
   base_url: "https://api.openai.com"
-  tunnel_id: "여기에_터널ID"
-  api_key: "여기에_OpenAI키"
+
+  # 2단계의 터널 ID. "tunnel_" 접두사까지 통째로 붙여넣습니다.
+  tunnel_id: "tunnel_0123456789abcdef0123456789abcdef"
+
+  # 3단계의 API 키. "sk-" 로 시작하는 문자열 전체입니다.
+  api_key: "sk-proj-AbCdEf0123456789...(중략)...WxYz"
 
 health:
   listen_addr: "127.0.0.1:8080"
@@ -249,8 +271,28 @@ mcp:
   # GPT Bridge는 모든 요청에 Authorization 헤더를 요구한다(없으면 401).
   # ChatGPT는 이 헤더를 보낼 수단이 없으므로 여기서 대신 붙인다.
   extra_headers:
-    Authorization: "Bearer 여기에_64자토큰"
+    # 4단계의 64자 토큰. "Bearer" 와 공백 1칸은 그대로 두고 뒤만 바꿉니다.
+    Authorization: "Bearer 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 ```
+
+> 위 세 값은 **모양을 보여 주는 예시**입니다. 그대로 두면 동작하지 않습니다.
+
+세 자리를 앞에서 모은 값으로 바꾸세요. **따옴표는 그대로 둡니다.**
+
+| 자리 | 모양 | 주의 |
+|---|---|---|
+| `tunnel_id` | `tunnel_` + 16진수 32자 | **`tunnel_` 까지 포함**해 통째로 넣습니다. 숫자만 넣으면 안 됩니다 |
+| `api_key` | `sk-` 또는 `sk-proj-` 로 시작 | 발급 화면에 나온 문자열 **전체** |
+| `Authorization` | `Bearer ` + 16진수 64자 | **`Bearer` 와 공백 1칸은 남겨 두고** 그 뒤만 교체 |
+
+> ⚠️ **`Bearer` 를 지우지 마세요.** `Bearer` + 공백 1칸 + 토큰입니다.
+> 빠지면 감사 로그에 `auth_failure / malformed` 로 찍힙니다.
+
+> **들여쓰기가 중요합니다.** YAML은 왼쪽 여백으로 구조를 판단합니다.
+> 붙여넣은 그대로 두시고, 값을 채울 때 줄 앞 공백을 건드리지 마세요.
+> **탭이 아니라 스페이스**를 씁니다.
+
+### 저장하기
 
 **파일 → 다른 이름으로 저장**:
 
@@ -262,53 +304,8 @@ mcp:
 최종 경로가 이렇게 됩니다.
 
 ```
-%APPDATA%\tunnel-client\gpt-bridge.yaml
+C:\Users\<사용자이름>\AppData\Roaming\tunnel-client\gpt-bridge.yaml
 ```
-
-> **들여쓰기가 중요합니다.** YAML은 왼쪽 여백으로 구조를 판단합니다.
-> 붙여넣은 그대로 두시고, 값을 채울 때 앞 공백을 건드리지 마세요.
-> **탭이 아니라 스페이스**를 씁니다.
-
-> **`tunnel_id`와 `api_key`에 2·3단계에서 적어 둔 값을 지금 넣으셔도 됩니다.**
-> 토큰(`Authorization`)만 6단계에서 나옵니다.
-
----
-
-## 6단계 🧩 — GPT Bridge 서버 켜고 토큰 얻기
-
-VS Code에서 **작업할 폴더를 연 창**에서 합니다.
-
-1. `Ctrl + ,` → `gptBridge.tunnel.provider` 검색 → **`none`** 으로 변경
-
-   > 기본값 `cloudflare`로 두면 확장이 자기 터널을 또 띄웁니다. OpenAI 터널을
-   > 쓸 때는 필요 없고, 공개 주소가 생겨 버려 오히려 손해입니다.
-
-2. `Ctrl + Shift + P` → **`GPT Bridge: 서버 시작`**
-3. `Ctrl + Shift + P` → **`GPT Bridge: 인증 토큰 복사`**
-
-64자짜리 문자열이 클립보드에 들어갑니다.
-
-## 7단계 📝 — 설정 파일에 값 채우기
-
-`Win + R` → 붙여넣고 확인:
-
-```
-notepad %APPDATA%\tunnel-client\gpt-bridge.yaml
-```
-
-세 자리를 채웁니다. **따옴표는 그대로 두세요.**
-
-```yaml
-  tunnel_id: "tunnel_0123456789abcdef0123456789abcdef"
-  api_key: "sk-..."
-...
-    Authorization: "Bearer 64자토큰"
-```
-
-> ⚠️ **`Bearer` 를 지우지 마세요.** `Bearer` + 공백 1칸 + 토큰입니다.
-> 빠지면 감사 로그에 `auth_failure / malformed` 로 찍힙니다.
-
-저장하고 닫습니다.
 
 > **비밀값이 파일에 평문으로 남습니다.** 이 파일은 `%APPDATA%` 안에 있어 git에
 > 올라가지도, 다른 기기로 동기화되지도 않으므로 개인 PC에서는 무난한 선택입니다.
@@ -316,7 +313,7 @@ notepad %APPDATA%\tunnel-client\gpt-bridge.yaml
 
 ---
 
-## 8단계 📁 — 실행
+## 7단계 📁 — 실행
 
 `tunnel-client.exe` 가 있는 폴더에 메모장으로 아래 내용을 만들고
 **`터널 시작.bat`** 으로 저장합니다. (파일 형식 = 모든 파일)
@@ -377,7 +374,7 @@ exit /b 1
 
 ---
 
-## 9단계 🌐 — ChatGPT에 등록
+## 8단계 🌐 — ChatGPT에 등록
 
 **터널이 돌아가는 동안** 해야 합니다. 꺼져 있으면 ChatGPT가 툴 목록을 못 가져옵니다.
 
@@ -461,7 +458,7 @@ notepad %APPDATA%\Code\User\globalStorage\local.gpt-bridge\audit\audit.jsonl
 | 〃 | `auth_failure` / `malformed` | `Bearer ` 접두사 누락 |
 | 〃 | `auth_failure` / `mismatch` | 토큰 값이 틀림. **재발급 후 설정 파일을 안 고쳤을 때** 가장 흔함 |
 | 툴 목록에 검색이 없음 | — | ripgrep 누락. 그 PC에서 `.vsix`를 다시 만들어야 함 |
-| GPT가 툴을 아예 안 부름 | 아무것도 없음 | 커스텀 지침 미적용 (9단계) |
+| GPT가 툴을 아예 안 부름 | 아무것도 없음 | 커스텀 지침 미적용 (8단계) |
 | `doctor` 가 API 키 오류 | — | 키가 폐기됐거나, 관리자 키(Admin key)를 잘못 넣음 |
 | 설정 파일을 못 읽는다 | — | `gpt-bridge.yaml.txt` 로 저장됐을 가능성. 탐색기에서 확장자 표시를 켜고 확인 |
 | `.bat` 실행 시 `'...'은(는) 내부 또는 외부 명령이 아닙니다` 가 쏟아짐 | — | 배치 파일에 한글이 들어갔고 UTF-8로 저장됨. **안내 문구를 영문으로** 바꾸세요 (8단계 경고) |
