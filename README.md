@@ -93,8 +93,12 @@ ChatGPT ──(인증: 없음)──▶ OpenAI 터널 ◀──(나가는 연결
 ### 2. API 키 발급
 
 [API keys](https://platform.openai.com/settings/organization/api-keys) →
-**Create new secret key**. 권한에 **Tunnels** 항목이 있으면 **Read + Use**를 켭니다.
+**Create new secret key**. 권한은 **All**로 두세요 — 터널 전용 권한 항목은 없습니다.
 `sk-`로 시작하는 값을 적어 두세요 — **한 번만 보입니다.**
+
+> 이 키는 설정 파일에 평문으로 저장되고 오래 떠 있는 프로세스가 씁니다.
+> **이 용도로만 쓰는 키를 따로 발급**하세요. 다른 데 쓰던 키를 재사용하면
+> 나중에 폐기할 때 그쪽까지 같이 끊깁니다.
 
 ### 3. tunnel-client 내려받기
 

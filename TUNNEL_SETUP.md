@@ -129,7 +129,7 @@ npm run setup
 1. https://platform.openai.com/settings/organization/api-keys 접속
 2. **Create new secret key**
 3. 이름은 아무거나 (예: `gpt-bridge-tunnel`)
-4. 권한 항목에 **Tunnels** 가 있으면 **Read + Use** 를 켭니다
+4. 권한은 **All** 로 둡니다 — 터널 전용 권한 항목은 없습니다
 5. **`sk-` 로 시작하는 긴 문자열**이 나옵니다 → **메모장에 적어 두세요**
 
 > 이 값은 **한 번만 보입니다.** 창을 닫으면 다시 못 봅니다. 잃어버리면 새로
@@ -452,7 +452,7 @@ notepad %APPDATA%\Code\User\globalStorage\local.gpt-bridge\audit\audit.jsonl
 | 〃 | `auth_failure` / `mismatch` | 토큰 값이 틀림. **재발급 후 설정 파일을 안 고쳤을 때** 가장 흔함 |
 | 툴 목록에 검색이 없음 | — | ripgrep 누락. 그 PC에서 `.vsix`를 다시 만들어야 함 |
 | GPT가 툴을 아예 안 부름 | 아무것도 없음 | 커스텀 지침 미적용 (9단계) |
-| `doctor` 가 API 키 오류 | — | 키 권한에 Tunnels Read+Use 가 없거나 관리자 키를 잘못 넣음 |
+| `doctor` 가 API 키 오류 | — | 키가 폐기됐거나, 관리자 키(Admin key)를 잘못 넣음 |
 | 설정 파일을 못 읽는다 | — | `gpt-bridge.yaml.txt` 로 저장됐을 가능성. 탐색기에서 확장자 표시를 켜고 확인 |
 | `.bat` 실행 시 `'...'은(는) 내부 또는 외부 명령이 아닙니다` 가 쏟아짐 | — | 배치 파일에 한글이 들어갔고 UTF-8로 저장됨. **안내 문구를 영문으로** 바꾸세요 (8단계 경고) |
 
@@ -515,7 +515,7 @@ Cloudflare로 하면 워크스페이스가 공개 HTTPS 주소로 열리고 토�
 ```
 [ ] git clone → npm install → npm run setup   (그 PC에서 직접. ripgrep 때문)
 [ ] OpenAI에 터널 만들기 → 터널ID 확보      (PC마다 따로 권장)
-[ ] API 키 발급 (Tunnels Read + Use)
+[ ] API 키 발급 (권한 All, 이 용도 전용으로)
 [ ] tunnel-client 내려받기 + 해시 확인
 [ ] 탐색기로 압축 풀기 (저장소 밖)
 [ ] %APPDATA%\tunnel-client\gpt-bridge.yaml 작성

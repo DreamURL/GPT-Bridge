@@ -95,8 +95,12 @@ Note down the ID that starts with `tunnel_`.
 ### 2. Create an API key
 
 [API keys](https://platform.openai.com/settings/organization/api-keys) →
-**Create new secret key**. If a **Tunnels** permission is offered, enable
-**Read + Use**. Copy the `sk-` value — **it is shown only once.**
+**Create new secret key**. Leave the permissions at **All** — there is no
+tunnel-specific scope. Copy the `sk-` value — **it is shown only once.**
+
+> This key is stored in plain text in a config file and used by a long-running
+> process. **Issue a key dedicated to this purpose.** Reusing a key from
+> somewhere else means revoking it later breaks that other thing too.
 
 ### 3. Download tunnel-client
 

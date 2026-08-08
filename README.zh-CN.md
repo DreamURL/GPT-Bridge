@@ -92,8 +92,11 @@ ChatGPT ──(认证：无)──▶ OpenAI 隧道 ◀──(出站连接)─�
 ### 2. 创建 API 密钥
 
 [API keys](https://platform.openai.com/settings/organization/api-keys) →
-**Create new secret key**。如果权限里有 **Tunnels** 一项，请启用 **Read + Use**。
+**Create new secret key**。权限保持 **All** 即可 —— 没有隧道专用的权限项。
 复制以 `sk-` 开头的值 —— **它只显示一次。**
+
+> 这个密钥会以明文保存在配置文件里，并由常驻进程使用。
+> **请单独签发一个专用于此的密钥。** 复用其他地方的密钥，日后吊销时会把那边一起弄停。
 
 ### 3. 下载 tunnel-client
 

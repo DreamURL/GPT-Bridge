@@ -96,8 +96,12 @@ ChatGPT ──(認証: なし)──▶ OpenAI トンネル ◀──(外向き�
 ### 2. API キーを発行する
 
 [API keys](https://platform.openai.com/settings/organization/api-keys) →
-**Create new secret key**。権限に **Tunnels** の項目があれば **Read + Use** を
-有効にします。`sk-` で始まる値を控えてください — **表示されるのは一度きりです。**
+**Create new secret key**。権限は **All** のままにします — トンネル専用の権限項目は
+ありません。`sk-` で始まる値を控えてください — **表示されるのは一度きりです。**
+
+> このキーは設定ファイルに平文で保存され、常駐プロセスが使用します。
+> **この用途専用のキーを発行してください。** 他で使っているキーを流用すると、
+> 後で破棄する際にそちらまで一緒に止まります。
 
 ### 3. tunnel-client をダウンロードする
 
