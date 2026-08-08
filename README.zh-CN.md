@@ -1,6 +1,6 @@
 <div align="right">
-  <a href="README.md">한국어</a> ·
-  <a href="README.en.md">English</a> ·
+  <a href="README.md">English</a> ·
+  <a href="README.kr.md">한국어</a> ·
   <a href="README.ja.md">日本語</a> ·
   <b>简体中文</b>
 </div>
@@ -81,7 +81,7 @@ ChatGPT ──(认证：无)──▶ OpenAI 隧道 ◀──(出站连接)─�
 不会产生任何公开地址，**令牌也不会离开你的电脑。**
 
 以下是摘要。逐屏的详细步骤和故障排查见
-[`TUNNEL_SETUP.md`](./TUNNEL_SETUP.md)。
+[`TUNNEL_SETUP.md`](./TUNNEL_SETUP.md)（英文）。
 
 **先收集三个值，然后在第 5 步一次性填进配置文件。** 请先记在记事本里。
 
@@ -112,8 +112,8 @@ ChatGPT ──(认证：无)──▶ OpenAI 隧道 ◀──(出站连接)─�
 
 1. `Ctrl+,` → 搜索 `gptBridge.tunnel.provider` → 改为 **`none`**
    （让扩展不再自行启动隧道）
-2. `Ctrl+Shift+P` → **`GPT Bridge: 서버 시작`**（启动服务器）
-3. `Ctrl+Shift+P` → **`GPT Bridge: 인증 토큰 복사`**（复制认证令牌）
+2. `Ctrl+Shift+P` → **`GPT Bridge: Start server`**
+3. `Ctrl+Shift+P` → **`GPT Bridge: Copy auth token`**
 
 剪贴板里会得到一个 64 位字符串。**请记下来。**
 
@@ -239,7 +239,7 @@ tunnel-client run --profile gpt-bridge                # 运行（保持窗口开
 
 ### 8. 设置指令
 
-`Ctrl+Shift+P` → **`GPT Bridge: ChatGPT 지침 복사`**（复制 ChatGPT 指令），
+`Ctrl+Shift+P` → **`GPT Bridge: Copy ChatGPT instructions`**，
 然后粘贴到 ChatGPT。
 
 **这实际上是必需的。** 如果没有明确要求，GPT 很少会调用自定义工具。
@@ -253,7 +253,7 @@ tunnel-client run --profile gpt-bridge                # 运行（保持窗口开
 
 ### 日常启动顺序
 
-1. VS Code → `GPT Bridge: 서버 시작`
+1. VS Code → `GPT Bridge: Start server`
 2. `tunnel-client run --profile gpt-bridge`
 
 ---
@@ -274,7 +274,7 @@ tunnel-client run --profile gpt-bridge                # 运行（保持窗口开
 - **审计日志** —— 以 JSONL 记录，不只是工具调用，还包括拦截、拒绝、过期和认证失败。
 
 一旦令牌泄露，整个工作区都会暴露。这是已接受的取舍，应对方式是
-`GPT Bridge: 토큰 재발급`（重新签发令牌）。重新签发后，也要同步更新配置文件里的
+`GPT Bridge: Regenerate token`。重新签发后，也要同步更新配置文件里的
 `Authorization`。
 
 ## 设置项

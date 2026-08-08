@@ -1,69 +1,72 @@
-# ChatGPT 연동 설치 가이드 (OpenAI Secure MCP Tunnel)
+# Connecting ChatGPT (OpenAI Secure MCP Tunnel)
 
-GPT Bridge를 ChatGPT에 연결하는 전체 절차입니다.
-**아무 PC에서나 이 문서만 보고 처음부터 끝까지** 할 수 있게 썼습니다.
+The full procedure for connecting GPT Bridge to ChatGPT.
+Written so that **any machine can be set up from scratch with only this document.**
 
-대부분 마우스로 합니다. 명령 프롬프트가 필요한 곳은 딱 두 군데뿐이고,
-각 단계 제목에 무엇으로 하는지 표시해 두었습니다.
+Most of it is done with the mouse. Only two steps need a command prompt, and
+every step title says which tool you need.
 
-| 표시 | 뜻 |
+| Mark | Means |
 |---|---|
-| 🌐 | 웹 브라우저 |
-| 📁 | 탐색기 (마우스) |
-| 📝 | 메모장 |
-| 💻 | 명령 프롬프트 |
+| 🌐 | Web browser |
+| 📁 | File Explorer (mouse) |
+| 📝 | Notepad |
+| 💻 | Command prompt |
 | 🧩 | VS Code |
 
-확장 자체의 개요·보안·설정은 [`README.md`](./README.md)에 있습니다.
+For an overview of the extension itself, its security model and settings, see
+[`README.md`](./README.md).
 
 ---
 
-## 0. 무슨 구조인가
+## 0. How this works
 
-ChatGPT는 인터넷에 있고 코드는 내 PC에 있습니다. 인터넷에서 내 PC로 그냥 들어올
-수는 없습니다 — 초인종이 없으니까요.
+ChatGPT lives on the internet and your code lives on your PC. Nothing can reach
+in from the outside — there is no doorbell.
 
-그래서 **반대로** 합니다. 내 PC가 OpenAI로 전화를 걸어 놓고 끊지 않습니다.
-ChatGPT가 뭔가 필요하면 이미 열린 그 선으로 얘기합니다.
+So we do the **opposite**. Your PC places a call to OpenAI and never hangs up.
+When ChatGPT needs something, it speaks over that already-open line.
 
 ```
 ChatGPT
-   │  ① 인증 "없음"으로 등록 (ChatGPT는 비밀번호를 보내지 않는다)
-   ▼
-OpenAI 터널 (전화 교환소)
-   ▲
-   │  ② tunnel-client가 여기로 전화를 걸어 놓는다 (나가는 방향)
-tunnel-client  ← 내 PC에서 실행
-   │  ③ 여기서 Authorization: Bearer 를 붙여 준다
-   ▼
+   |  (1) registered with authentication "none" (ChatGPT sends no password)
+   v
+OpenAI tunnel (the switchboard)
+   ^
+   |  (2) tunnel-client dials out to here and holds the line
+tunnel-client  <- runs on your PC
+   |  (3) this is where Authorization: Bearer gets attached
+   v
 http://127.0.0.1:3737/mcp
-GPT Bridge 확장 (코드를 읽고 고치는 본체)
+GPT Bridge extension (the part that reads and edits code)
 ```
 
-**핵심은 ③입니다.** GPT Bridge는 모든 요청에 비밀번호(Bearer 토큰)를 요구하는데,
-ChatGPT의 커넥터 등록 화면에는 인증 선택지가 `OAuth` / `인증없음` / `혼합` 셋뿐이라
-비밀번호를 보낼 방법이 없습니다. 그래서 `tunnel-client`가 **로컬로 넘길 때 대신
-붙여 줍니다.** 확장 코드는 고칠 필요가 없습니다.
+**Step (3) is the crux.** GPT Bridge requires a password (a Bearer token) on
+every request, but the ChatGPT connector screen only offers `OAuth` /
+`None` / `Mixed` for authentication — there is no way to send one. So
+`tunnel-client` **attaches it on the way to the local server instead.** No change
+to the extension is needed.
 
-부수 효과가 좋습니다. **토큰이 PC를 벗어나지 않고**, 공개 주소도 생기지 않습니다.
+The side effects are good: **the token never leaves your PC**, and no public
+address is created.
 
-### 준비하면서 모으게 되는 값 세 개
+### The three values you will collect
 
-나중에 설정 파일 한 곳에 몰아 넣습니다. 메모장에 적어 두세요.
+They all go into one config file later. Keep them in a scratch file.
 
-| 값 | 어디서 나오나 |
+| Value | Where it comes from |
 |---|---|
-| 터널 ID (`tunnel_...`) | 2단계 |
-| OpenAI API 키 (`sk-...`) | 3단계 |
-| GPT Bridge 토큰 (64자) | 4단계 |
+| Tunnel ID (`tunnel_...`) | Step 2 |
+| OpenAI API key (`sk-...`) | Step 3 |
+| GPT Bridge token (64 chars) | Step 4 |
 
 ---
 
-## 1단계 💻 — GPT Bridge 확장 설치
+## Step 1 💻 — Install the GPT Bridge extension
 
-터널을 붙일 대상이 먼저 있어야 합니다. **명령 네 줄이면 끝납니다.**
+You need something for the tunnel to point at. **Four commands.**
 
-필요한 것: [Git](https://git-scm.com/downloads),
+Requirements: [Git](https://git-scm.com/downloads),
 [Node.js](https://nodejs.org/) (LTS), VS Code.
 
 ```cmd
@@ -73,28 +76,29 @@ npm install
 npm run setup
 ```
 
-`npm run setup` 이 빌드(`.vsix` 생성)와 설치를 한 번에 합니다.
-끝나면 VS Code에서 `Ctrl+Shift+P` → **`Developer: Reload Window`**.
+`npm run setup` builds the `.vsix` and installs it in one go.
+When it finishes, run `Ctrl+Shift+P` → **`Developer: Reload Window`** in VS Code.
 
-왼쪽 활동 표시줄에 GPT Bridge 아이콘이 생기면 설치된 것입니다.
+The GPT Bridge icon appears in the left activity bar once it is installed.
 
-> ⚠️ **`.vsix`를 다른 PC에서 복사해 오지 마세요.** 파일 검색에 쓰는 ripgrep이
-> OS·CPU별로 다른 파일이고 `npm install`은 설치하는 기기의 것만 받습니다. 다른
-> 데서 만든 `.vsix`를 가져오면 검색·목록 기능이 조용히 죽습니다(README의 "`.vsix`를 다른 PC에서 복사해 오지 마세요" 참고).
-> 그래서 저장소에 `.vsix`를 넣지 않고 각 기기에서 빌드하게 되어 있습니다.
+> ⚠️ **Do not copy a `.vsix` from another machine.** The ripgrep binary used for
+> file search ships per OS and CPU, and `npm install` only fetches the one for
+> the machine doing the install. A `.vsix` built elsewhere makes search and
+> listing **fail silently.** That is why the repository does not contain a
+> `.vsix` and every machine builds its own.
 
-### `code` 명령을 못 찾는다고 나오면
+### If it says the `code` command was not found
 
-빌드는 됐고 설치만 실패한 것입니다. VS Code 화면에서 직접 넣으면 됩니다.
+The build succeeded; only the install step failed. Add it from the VS Code UI:
 
-1. 왼쪽 **확장** 아이콘 클릭
-2. 확장 패널 오른쪽 위 **`...`** → **VSIX에서 설치**
-3. 저장소 폴더의 `gpt-bridge-0.1.0.vsix` 선택
+1. Click the **Extensions** icon on the left
+2. `...` at the top right of the panel → **Install from VSIX**
+3. Pick `gpt-bridge-0.1.0.vsix` in the repository folder
 
-`code` 명령을 쓰고 싶으면 `Ctrl+Shift+P` →
-`Shell Command: Install 'code' command in PATH` 를 실행해 두세요.
+To enable the `code` command, run `Ctrl+Shift+P` →
+`Shell Command: Install 'code' command in PATH`.
 
-### 나중에 최신으로 갱신할 때
+### Updating later
 
 ```cmd
 git pull
@@ -104,142 +108,158 @@ npm run setup
 
 ---
 
-## 2단계 🌐 — OpenAI에 터널 만들기
+## Step 2 🌐 — Create a tunnel on OpenAI
 
-1. https://platform.openai.com/settings/organization/tunnels 접속
-2. 오른쪽 위 **Create tunnel**
-3. `Name`과 `Description` 입력 — **둘 다 필수**입니다
-4. `Organizations`는 기본값 그대로
+1. Go to https://platform.openai.com/settings/organization/tunnels
+2. **Create tunnel** at the top right
+3. Fill in `Name` and `Description` — **both are required**
+4. Leave `Organizations` at its default
 5. **Create**
 
-`tunnel_` 로 시작하는 32자리 ID가 나옵니다. **메모장에 적어 두세요.**
+You get a 32-character ID starting with `tunnel_`. **Write it down.**
 
 ```
-모양: tunnel_0123456789abcdef0123456789abcdef
+Shape: tunnel_0123456789abcdef0123456789abcdef
 ```
 
-> **PC마다 터널을 따로 만드는 것을 권합니다.** 하나의 터널에 여러 PC가 동시에
-> 붙으면 어느 쪽으로 요청이 갈지 예측하기 어렵습니다. 이름을 구분해 두면
-> (`gpt bridge - 집`, `gpt bridge - 회사`) 나중에 헷갈리지 않습니다.
+> **Create a separate tunnel per machine.** If several PCs attach to the same
+> tunnel it is hard to predict which one a request reaches. Naming them
+> distinctly (`gpt bridge - home`, `gpt bridge - work`) saves confusion later.
 
-## 3단계 🌐 — API 키 발급
+## Step 3 🌐 — Create an API key
 
-`tunnel-client`가 OpenAI에 "저 맞습니다"라고 보여 줄 신분증입니다.
+This is the ID card `tunnel-client` shows OpenAI to prove who it is.
 
-1. https://platform.openai.com/settings/organization/api-keys 접속
+1. Go to https://platform.openai.com/settings/organization/api-keys
 2. **Create new secret key**
-3. 이름은 아무거나 (예: `gpt-bridge-tunnel`)
-4. 권한은 **All** 로 둡니다 — 터널 전용 권한 항목은 없습니다
-5. **`sk-` 로 시작하는 긴 문자열**이 나옵니다 → **메모장에 적어 두세요**
+3. Any name (for example `gpt-bridge-tunnel`)
+4. Leave permissions at **All** — there is no tunnel-specific scope
+5. A long string starting with **`sk-`** appears → **write it down**
 
-> 이 값은 **한 번만 보입니다.** 창을 닫으면 다시 못 봅니다. 잃어버리면 새로
-> 만들면 되니 큰일은 아닙니다. 채팅·이슈·커밋에 붙여넣지 마세요.
+> This value is **shown only once.** Close the window and it is gone. Losing it
+> is not a big deal — just create another. Do not paste it into a chat, an issue
+> or a commit.
 
-> **관리자 키(Admin key)와 다릅니다.** 관리자 키는 터널을 만들고 지우는 용도이고
-> 오래 떠 있는 프로그램에는 주지 않습니다. 여기서 필요한 건 **런타임 키**입니다.
+> **This is not the Admin key.** Admin keys are for creating and deleting
+> tunnels and should never be handed to a long-running process. What you need
+> here is a **runtime key**.
 
----
-
-## 4단계 🧩 — GPT Bridge 서버 켜고 토큰 얻기
-
-VS Code에서 **작업할 폴더를 연 창**에서 합니다.
-
-1. `Ctrl + ,` → `gptBridge.tunnel.provider` 검색 → **`none`** 으로 변경
-
-   > 기본값 `cloudflare`로 두면 확장이 자기 터널을 또 띄웁니다. OpenAI 터널을
-   > 쓸 때는 필요 없고, 공개 주소가 생겨 버려 오히려 손해입니다.
-
-2. `Ctrl + Shift + P` → **`GPT Bridge: 서버 시작`**
-3. `Ctrl + Shift + P` → **`GPT Bridge: 인증 토큰 복사`**
-
-64자짜리 문자열이 클립보드에 들어갑니다.
-
-이걸로 값 세 개가 다 모였습니다.
+> This key is stored in plain text in a config file and used by a resident
+> process. **Issue a key dedicated to this purpose.** Reusing a key from
+> somewhere else means revoking it later breaks that other thing too.
 
 ---
 
-## 5단계 🌐📁💻 — tunnel-client 내려받기
+## Step 4 🧩 — Start GPT Bridge and copy the token
 
-### 받기 (브라우저)
+Do this in the VS Code window that has **your working folder open**.
 
-1. https://github.com/openai/tunnel-client/releases 접속
-2. 최신 릴리스에서 **자기 PC에 맞는 것 하나만** 받습니다
+1. `Ctrl + ,` → search `gptBridge.tunnel.provider` → set it to **`none`**
 
-| 내 PC | 받을 파일 |
+   > Left at the default `cloudflare`, the extension starts a tunnel of its own.
+   > You do not need that with the OpenAI tunnel, and it creates a public
+   > address, which is worse.
+
+2. `Ctrl + Shift + P` → **`GPT Bridge: Start server`**
+3. `Ctrl + Shift + P` → **`GPT Bridge: Copy auth token`**
+
+A 64-character string lands on your clipboard.
+
+That is all three values.
+
+---
+
+## Step 5 🌐📁💻 — Download tunnel-client
+
+### Download (browser)
+
+1. Go to https://github.com/openai/tunnel-client/releases
+2. From the latest release, download **only the one that matches your PC**
+
+| My PC | File to download |
 |---|---|
-| Windows 일반 (대부분) | `tunnel-client-vX.Y.Z-windows-amd64.zip` |
-| Windows ARM (Surface 등) | `...-windows-arm64.zip` |
-| Mac (M1 이상) | `...-darwin-arm64.zip` |
-| Mac (인텔) | `...-darwin-amd64.zip` |
+| Windows, typical | `tunnel-client-vX.Y.Z-windows-amd64.zip` |
+| Windows ARM (Surface etc.) | `...-windows-arm64.zip` |
+| Mac (M1 or later) | `...-darwin-arm64.zip` |
+| Mac (Intel) | `...-darwin-amd64.zip` |
 
-`all.zip`(150MB)은 전 플랫폼 묶음이라 받을 필요 없습니다.
+`all.zip` (150 MB) bundles every platform and is not needed.
 
-3. 같은 페이지의 **`SHA256SUMS.txt`** 를 클릭해 열어 둡니다
+3. Open **`SHA256SUMS.txt`** from the same page and keep it handy
 
-### 해시 확인 (명령 프롬프트 — 한 줄)
+### Verify the hash (command prompt — one line)
 
-받은 파일이 중간에 바뀌지 않았는지 확인합니다. 남이 만든 실행 파일을 그냥 돌리지
-않는다는 원칙이고, 이 확장이 cloudflared에 대해 하는 것과 같은 절차입니다.
+This checks that the file you received was not altered in transit. The rule is
+not to run someone else's executable unverified, and it is the same procedure
+this extension applies to cloudflared.
 
-명령 프롬프트에서 (파일명은 받은 버전에 맞게):
+In a command prompt (adjust the filename to the version you downloaded):
 
 ```cmd
 certutil -hashfile "%USERPROFILE%\Downloads\tunnel-client-v0.0.11-windows-amd64.zip" SHA256
 ```
 
-출력된 값이 `SHA256SUMS.txt`의 해당 파일 줄과 **글자 하나까지 같아야** 합니다.
+The output must match the line for that file in `SHA256SUMS.txt` **character for
+character**.
 
-> ❌ **다르면 멈추세요.** 다시 받지 말고 파일을 지운 뒤 원인부터 확인합니다.
-> 재시도로 넘기지 않습니다.
+> `ERROR_FILE_NOT_FOUND` means you pointed at a **folder**. This command hashes
+> a single file, so it must point at the **zip**, not an extracted directory —
+> and the values in `SHA256SUMS.txt` are for the zip, so extracted files will
+> never match. To locate the zip:
+> `dir /s /b "%USERPROFILE%\*tunnel-client*.zip"`
 
-### 압축 풀기 (탐색기)
+> ❌ **If they differ, stop.** Do not download again — delete the file and find
+> out why first. Never paper over it with a retry.
 
-zip 파일 **우클릭 → 압축 풀기**. 폴더는 어디든 상관없습니다.
+### Extract (File Explorer)
 
-> ⚠️ **저장소 폴더 안에는 풀지 마세요.** 83MB짜리 외부 도구라 git에 딸려 들어가면
-> 저장소가 무거워집니다.
+**Right-click the zip → Extract All.** Any folder is fine.
 
-안에 이런 것들이 들어 있습니다.
+> ⚠️ **Do not extract into the repository folder.** It is an 83 MB external tool
+> and dragging it into git makes the repository unusable.
 
-| 파일 | |
+Inside you will find:
+
+| File | |
 |---|---|
-| `tunnel-client.exe` | 본체 |
-| `cloudflared.exe` | 실제 터널을 만드는 프로그램 (OpenAI가 내장해 배포) |
-| `cloudflared-manifest.json` | 내장된 cloudflared 버전 정보 |
+| `tunnel-client.exe` | The client itself |
+| `cloudflared.exe` | The program that actually creates the tunnel (bundled by OpenAI) |
+| `cloudflared-manifest.json` | Which cloudflared version is bundled |
 
-> OpenAI 터널은 내부적으로 **Cloudflare Tunnel**을 씁니다. 버전 관리와 보안 패치는
-> OpenAI가 맡는다고 매니페스트에 적혀 있어 우리가 신경 쓸 부분은 없습니다.
+> The OpenAI tunnel uses **Cloudflare Tunnel** underneath. The manifest states
+> that OpenAI owns its version management and security patches, so it is not
+> something you have to track.
 
 ---
 
-## 6단계 📝 — 설정 파일 만들기
+## Step 6 📝 — Write the config file
 
-`tunnel-client`가 읽을 설정 파일입니다. 메모장으로 직접 만듭니다.
+This is the file `tunnel-client` reads. Create it by hand in Notepad.
 
-### 폴더 열기
+### Open the folder
 
-`Win + R` → 아래를 붙여넣고 확인:
+`Win + R` → paste this and confirm:
 
 ```
 %APPDATA%
 ```
 
-이 폴더가 열립니다.
+This folder opens:
 
 ```
-C:\Users\<사용자이름>\AppData\Roaming
+C:\Users\<username>\AppData\Roaming
 ```
 
-> ⚠️ **`%APPDATA%`는 `AppData` 폴더가 아니라 그 아래 `Roaming`을 가리킵니다.**
-> `AppData\tunnel-client`가 아니라 `AppData\Roaming\tunnel-client`입니다.
-> 위 방법으로 열면 이미 맞는 위치이니 거기서 바로 만드시면 됩니다.
+> ⚠️ **`%APPDATA%` is not the `AppData` folder — it points at `Roaming` inside
+> it.** The path is `AppData\Roaming\tunnel-client`, not `AppData\tunnel-client`.
+> Opening it the way above already puts you in the right place.
 
-열린 폴더 안에 **`tunnel-client`** 라는 폴더를 만듭니다.
-(우클릭 → 새로 만들기 → 폴더)
+In that folder, create a folder named **`tunnel-client`**.
+(Right-click → New → Folder)
 
-### 파일 만들기
+### Create the file
 
-메모장을 열고 아래를 통째로 붙여넣은 뒤, **값 세 자리를 지금 모두 채웁니다.**
+Open Notepad, paste the whole block below, then **fill in all three values now.**
 
 ```yaml
 config_version: 1
@@ -247,11 +267,11 @@ config_version: 1
 control_plane:
   base_url: "https://api.openai.com"
 
-  # 2단계의 터널 ID. "tunnel_" 접두사까지 통째로 붙여넣습니다.
+  # Tunnel ID from step 2. Paste it whole, including the "tunnel_" prefix.
   tunnel_id: "tunnel_0123456789abcdef0123456789abcdef"
 
-  # 3단계의 API 키. "sk-" 로 시작하는 문자열 전체입니다.
-  api_key: "sk-proj-AbCdEf0123456789...(중략)...WxYz"
+  # API key from step 3. The entire string starting with "sk-".
+  api_key: "sk-proj-AbCdEf0123456789...(truncated)...WxYz"
 
 health:
   listen_addr: "127.0.0.1:8080"
@@ -260,63 +280,66 @@ admin_ui:
   open_browser: false
 
 log:
-  level: info
-  format: json
+  level: warn
 
 mcp:
   server_urls:
     - channel: main
       url: "http://127.0.0.1:3737/mcp"
 
-  # GPT Bridge는 모든 요청에 Authorization 헤더를 요구한다(없으면 401).
-  # ChatGPT는 이 헤더를 보낼 수단이 없으므로 여기서 대신 붙인다.
+  # GPT Bridge requires an Authorization header on every request (401 without it).
+  # ChatGPT has no way to send one, so it is attached here instead.
   extra_headers:
-    # 4단계의 64자 토큰. "Bearer" 와 공백 1칸은 그대로 두고 뒤만 바꿉니다.
+    # 64-char token from step 4. Keep "Bearer" and the single space; replace only what follows.
     Authorization: "Bearer 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 ```
 
-> 위 세 값은 **모양을 보여 주는 예시**입니다. 그대로 두면 동작하지 않습니다.
+> The three values above are **shape examples**. Left as-is, nothing will work.
 
-세 자리를 앞에서 모은 값으로 바꾸세요. **따옴표는 그대로 둡니다.**
+Replace them with what you collected. **Keep the quotation marks.**
 
-| 자리 | 모양 | 주의 |
+| Field | Shape | Watch out |
 |---|---|---|
-| `tunnel_id` | `tunnel_` + 16진수 32자 | **`tunnel_` 까지 포함**해 통째로 넣습니다. 숫자만 넣으면 안 됩니다 |
-| `api_key` | `sk-` 또는 `sk-proj-` 로 시작 | 발급 화면에 나온 문자열 **전체** |
-| `Authorization` | `Bearer ` + 16진수 64자 | **`Bearer` 와 공백 1칸은 남겨 두고** 그 뒤만 교체 |
+| `tunnel_id` | `tunnel_` + 32 hex chars | Include the **`tunnel_` prefix** — not just the digits |
+| `api_key` | starts with `sk-` or `sk-proj-` | The **entire** string shown at creation |
+| `Authorization` | `Bearer ` + 64 hex chars | Keep **`Bearer` and the single space**; replace only what follows |
 
-> ⚠️ **`Bearer` 를 지우지 마세요.** `Bearer` + 공백 1칸 + 토큰입니다.
-> 빠지면 감사 로그에 `auth_failure / malformed` 로 찍힙니다.
+> ⚠️ **Do not delete `Bearer`.** It is `Bearer`, one space, then the token.
+> Drop it and the audit log records `auth_failure / malformed`.
 
-> **들여쓰기가 중요합니다.** YAML은 왼쪽 여백으로 구조를 판단합니다.
-> 붙여넣은 그대로 두시고, 값을 채울 때 줄 앞 공백을 건드리지 마세요.
-> **탭이 아니라 스페이스**를 씁니다.
+> **Indentation matters.** YAML derives structure from leading whitespace.
+> Leave the block exactly as pasted and do not touch the indentation while
+> filling in values. Use **spaces, not tabs**.
 
-### 저장하기
+### Saving
 
-**파일 → 다른 이름으로 저장**:
+**File → Save As**:
 
-- 위치: 방금 만든 `tunnel-client` 폴더
-- 파일 이름: **`gpt-bridge.yaml`**
-- 파일 형식: **모든 파일** ← 이걸 바꾸지 않으면 `gpt-bridge.yaml.txt` 로 저장됩니다
-- 인코딩: `UTF-8`
+- Location: the `tunnel-client` folder you just created
+- File name: **`gpt-bridge.yaml`**
+- Save as type: **All Files** ← without this it is saved as `gpt-bridge.yaml.txt`
+- Encoding: `UTF-8`
 
-최종 경로가 이렇게 됩니다.
+The final path looks like this:
 
 ```
-C:\Users\<사용자이름>\AppData\Roaming\tunnel-client\gpt-bridge.yaml
+C:\Users\<username>\AppData\Roaming\tunnel-client\gpt-bridge.yaml
 ```
 
-> **비밀값이 파일에 평문으로 남습니다.** 이 파일은 `%APPDATA%` 안에 있어 git에
-> 올라가지도, 다른 기기로 동기화되지도 않으므로 개인 PC에서는 무난한 선택입니다.
-> 더 조이고 싶으면 값 대신 `"env:변수명"` 이라고 쓰고 환경변수로 넘길 수 있습니다.
+> **Secrets live in this file in plain text.** It sits under `%APPDATA%`, so it
+> is not committed to git and is not synced to other machines — a reasonable
+> trade-off on a personal PC. To tighten it further, write `"env:VARNAME"`
+> instead of the value and pass it through an environment variable.
+>
+> Do not keep this file open in an editor with AI integrations; open it in
+> Notepad only while editing, then close it.
 
 ---
 
-## 7단계 📁 — 실행
+## Step 7 📁 — Run it
 
-`tunnel-client.exe` 가 있는 폴더에 메모장으로 아래 내용을 만들고
-**`터널 시작.bat`** 으로 저장합니다. (파일 형식 = 모든 파일)
+In the folder containing `tunnel-client.exe`, create the file below with Notepad
+and save it as **`start-tunnel.bat`** (Save as type = All Files).
 
 ```bat
 @echo off
@@ -352,184 +375,189 @@ pause
 exit /b 1
 ```
 
-> ⚠️ **배치 파일 안에는 한글을 쓰지 마세요.** cmd는 `.bat`을 UTF-8이 아니라 시스템
-> 기본 인코딩으로 읽습니다. 메모장이 UTF-8로 저장하면 한글이 깨지고, 깨진 글자를
-> 명령어로 해석하려다 `'...'은(는) 내부 또는 외부 명령이 아닙니다` 오류가 쏟아집니다.
-> 안내 문구를 영문으로 두면 인코딩과 무관하게 항상 동작합니다.
+> ⚠️ **Do not put non-ASCII text in a batch file.** cmd reads `.bat` files using
+> the system codepage, not UTF-8. Notepad saves as UTF-8, so accented or
+> non-Latin characters get mangled and cmd tries to run the garbage as commands,
+> producing a flood of `'...' is not recognized as an internal or external command`.
+> Keeping the messages in plain ASCII always works.
 
-**더블클릭하면 실행됩니다.**
+**Double-click to run.**
 
-먼저 설정을 점검하고, 통과해야 연결로 넘어갑니다. 실패하면 이유를 보여 주고
-창이 멈춰 있어 읽을 수 있습니다.
+It checks the configuration first and only proceeds if that passes. On failure
+it prints the reason and waits so you can read it.
 
-> **이 창은 켜 둔 채로 둡니다.** 전화를 걸어 놓은 상태라 닫으면 끊깁니다.
+> **Leave this window open.** It is holding the call; closing it drops the tunnel.
 
-바탕화면에 두고 쓰려면 파일 우클릭 → 보내기 → **바탕 화면에 바로 가기 만들기**.
+To keep it handy, right-click the file → Send to → **Desktop (create shortcut)**.
 
-상태 확인은 브라우저에서:
+Status pages:
 
-- http://127.0.0.1:8080/healthz — 살아 있는지
-- http://127.0.0.1:8080/readyz — 연결이 준비됐는지
-- http://127.0.0.1:8080/ui — 상태 화면
-
----
-
-## 8단계 🌐 — ChatGPT에 등록
-
-**터널이 돌아가는 동안** 해야 합니다. 꺼져 있으면 ChatGPT가 툴 목록을 못 가져옵니다.
-
-1. ChatGPT → 설정 → **Apps & Connectors** → **Advanced** → **Developer Mode** 켜기
-2. 새 커넥터(플러그인) 추가
-3. `이름`: 아무거나
-4. `연결`: **터널** 선택 → 목록에서 만든 터널 고르기
-5. `인증`: **`인증없음`** ← **반드시 이것**
-6. 위험 안내 체크박스에 동의 → **만들기**
-
-> ### 왜 `인증없음`인가
->
-> 공식 문서에 이런 규칙이 있습니다 — **"커넥터가 전달한 요청 헤더가 마지막에
-> 적용되어 정적 헤더를 덮어쓴다."**
->
-> `OAuth`나 `혼합`을 고르면 ChatGPT가 자기 `Authorization` 헤더를 보내고, 그게
-> 설정 파일에 넣은 Bearer를 **밀어냅니다.** 그러면 GPT Bridge는 모르는 값을 받아
-> 401을 냅니다.
->
-> `인증없음`을 골라야 ChatGPT가 아무 헤더도 안 보내고 우리 비밀번호가 살아남습니다.
-> 오른쪽 `고급 OAuth 설정` 패널은 전혀 건드리지 않습니다.
-
-### 마지막으로 지침 넣기
-
-VS Code에서 `Ctrl+Shift+P` → **`GPT Bridge: ChatGPT 지침 복사`** 로 지침을 복사한 뒤
-ChatGPT에 붙여넣습니다. **커넥터 등록 화면에는 지침 칸이 없습니다.** 아래 세 곳
-중 하나에 넣으세요 — 적용 범위가 다릅니다.
-
-| 방법 | 적용 범위 | 위치 |
-|---|---|---|
-| **프로젝트 지침** ← 권장 | 그 프로젝트 안의 대화만 | 왼쪽 사이드바 → 프로젝트 만들기 → 지침 |
-| 전역 커스텀 지침 | **모든 대화** | 설정 → 개인 맞춤 설정 → 맞춤 설정 |
-| 대화창에 붙여넣기 | 그 대화 하나만 | 새 대화의 첫 메시지 |
-
-> **전역은 권하지 않습니다.** 관계없는 대화에서도 ChatGPT가 GPT Bridge 툴을
-> 부르려 합니다. 평소엔 터널이 꺼져 있으니 매번 실패하고 답변 품질만 나빠집니다.
->
-> 프로젝트 기능이 안 보이면 **대화창에 붙여넣는 방법**을 쓰세요. 번거롭지만
-> 지침이 대화 맨 앞에 있는 형태라 모델이 가장 잘 따릅니다.
-
-**선택이 아니라 사실상 필수입니다.** GPT는 명시적으로 시키지 않으면 커스텀 툴을
-잘 부르지 않습니다(README "지침 넣기" 참고). 지침에는 `edit_file` 우선 사용, 수정 후
-`get_diagnostics` 확인, 같은 파일 반복 읽기 금지(6~11번) 같은 내용도 들어 있어
-빠뜨리면 토큰이 훨씬 빨리 소진됩니다.
-
-### 동작 확인
-
-새 대화에서: **"이 프로젝트 구조를 설명하고 타입 에러를 알려줘"**
-
-- GPT가 `get_workspace_info` 를 먼저 부르면 정상입니다
-- VS Code 사이드바의 GPT Bridge 패널에 호출 기록이 실시간으로 쌓입니다
+- http://127.0.0.1:8080/healthz — is it alive
+- http://127.0.0.1:8080/readyz — is the connection ready
+- http://127.0.0.1:8080/ui — status dashboard
 
 ---
 
-## 매번 쓰는 순서
+## Step 8 🌐 — Register the connector in ChatGPT
 
-설치는 한 번이고, 이후에는 이것만 반복합니다.
+Do this **while the tunnel is running.** With it stopped, ChatGPT cannot fetch
+the tool list.
 
-1. 🧩 VS Code → `Ctrl+Shift+P` → `GPT Bridge: 서버 시작`
-2. 📁 `터널 시작.bat` 더블클릭
+1. ChatGPT → Settings → **Apps & Connectors** → **Advanced** → enable **Developer Mode**
+2. Add a connector → `Connection`: **Tunnel** → pick the tunnel you created
+3. `Authentication`: **None** ← **this one, definitely**
 
-끝입니다.
+> ### Why "None"?
+>
+> The official documentation states that **headers forwarded by the connector
+> are applied last and override static headers.**
+>
+> Pick `OAuth` or `Mixed` and ChatGPT sends its own `Authorization`, which
+> **pushes out** the Bearer token added in step 6. GPT Bridge then receives a
+> value it does not recognise and returns 401.
+>
+> With `None`, ChatGPT sends no header at all and the password `tunnel-client`
+> attached survives. Leave the `Advanced OAuth settings` panel on the right
+> completely alone.
+
+### Finally, add the instructions
+
+In VS Code, `Ctrl+Shift+P` → **`GPT Bridge: Copy ChatGPT instructions`**, then
+paste into ChatGPT. **The connector screen has no field for instructions** — put
+them in one of these three places, which differ in scope.
+
+| Where | Scope |
+|---|---|
+| **Project instructions** ← recommended | Conversations in that project only |
+| Global custom instructions | Every conversation |
+| First message of a chat | That chat only |
+
+> **Global is not recommended.** ChatGPT will reach for GPT Bridge tools in
+> unrelated conversations, where the tunnel is usually down, so every attempt
+> fails and answers get worse for no reason.
+>
+> If you cannot find the project feature, paste them as the **first message of a
+> chat**. It is tedious but works best — instructions at the very start of a
+> conversation are what the model follows most reliably.
+
+**This is effectively mandatory.** GPT rarely calls custom tools unless told to.
+The instructions also cover preferring `edit_file`, calling `get_diagnostics`
+after edits, and not re-reading whole files (items 6-11) — skip them and you
+burn through context far faster.
+
+### Checking that it works
+
+In a new conversation: **"Explain the structure of this project and tell me about any type errors."**
+
+- GPT calling `get_workspace_info` first means it is working
+- The GPT Bridge panel in VS Code fills with call records in real time
 
 ---
 
-## 문제가 생기면
+## Daily routine
 
-먼저 **감사 로그**를 보세요. 원인이 거의 바로 드러납니다.
-`Win + R` 에 붙여넣기:
+Installation is a one-time thing. After that, only this:
+
+1. 🧩 VS Code → `Ctrl+Shift+P` → `GPT Bridge: Start server`
+2. 📁 Double-click `start-tunnel.bat`
+
+That is all.
+
+---
+
+## When something goes wrong
+
+Check the **audit log** first. It almost always points straight at the cause.
+Paste this into `Win + R`:
 
 ```
 notepad %APPDATA%\Code\User\globalStorage\local.gpt-bridge\audit\audit.jsonl
 ```
 
-한 줄이 한 사건이고 맨 아래가 최신입니다.
+One line is one event; the newest is at the bottom.
 
-| 증상 | 로그 | 원인 |
+| Symptom | In the log | Cause |
 |---|---|---|
-| ChatGPT가 연결 실패 | **아무것도 없음** | 요청이 도달을 못 함 → 터널이 꺼졌거나 `url` 이 틀림 |
-| 연결은 되는데 전부 실패 | `auth_failure` / `missing` | `extra_headers` 를 안 넣었거나 들여쓰기가 틀림 |
-| 〃 | `auth_failure` / `malformed` | `Bearer ` 접두사 누락 |
-| 〃 | `auth_failure` / `mismatch` | 토큰 값이 틀림. **재발급 후 설정 파일을 안 고쳤을 때** 가장 흔함 |
-| 툴 목록에 검색이 없음 | — | ripgrep 누락. 그 PC에서 `.vsix`를 다시 만들어야 함 |
-| GPT가 툴을 아예 안 부름 | 아무것도 없음 | 커스텀 지침 미적용 (8단계) |
-| `doctor` 가 API 키 오류 | — | 키가 폐기됐거나, 관리자 키(Admin key)를 잘못 넣음 |
-| 설정 파일을 못 읽는다 | — | `gpt-bridge.yaml.txt` 로 저장됐을 가능성. 탐색기에서 확장자 표시를 켜고 확인 |
-| `.bat` 실행 시 `'...'은(는) 내부 또는 외부 명령이 아닙니다` 가 쏟아짐 | — | 배치 파일에 한글이 들어갔고 UTF-8로 저장됨. **안내 문구를 영문으로** 바꾸세요 (8단계 경고) |
+| ChatGPT cannot connect | **nothing at all** | The request never arrived — the tunnel is down or `url` is wrong |
+| Connects but everything fails | `auth_failure` / `missing` | `extra_headers` is absent or its indentation is wrong |
+| 〃 | `auth_failure` / `malformed` | The `Bearer ` prefix is missing |
+| 〃 | `auth_failure` / `mismatch` | Wrong token value. Most often **after regenerating the token without updating the config file** |
+| No search tool in the list | — | ripgrep is missing. Rebuild the `.vsix` on this machine |
+| GPT never calls any tool | nothing at all | The custom instructions were not applied |
+| `doctor` reports an API key error | — | The key was revoked, or an Admin key was used by mistake |
+| The config file is not found | — | It may have been saved as `gpt-bridge.yaml.txt`. Turn on file extensions in Explorer and check |
+| `.bat` floods with `'...' is not recognized...` | — | The batch file contains non-ASCII text saved as UTF-8. **Keep its messages in plain ASCII** |
 
-### 정상인데 오류처럼 보이는 것들
+### Things that look like errors but are not
 
-**첫 연결 때 아래 셋이 나오는 것은 정상입니다.** 무시하세요.
+**All three of these appear on the first connection and are normal.** Ignore them.
 
-| 어디에 | 무엇이 | 왜 |
+| Where | What | Why |
 |---|---|---|
-| tunnel-client 로그 | `OAuth discovery failed` — `invalid character '<'` | tunnel-client가 `/.well-known/oauth-protected-resource` 를 찔러 보는데 우리는 OAuth 서버가 아니라 그 주소가 없다. Express가 HTML 404를 주니 JSON 파서가 `<!DOCTYPE` 의 `<` 에서 걸린다 |
-| 감사 로그 | `auth_failure` / `missing` 2~3건 | 위와 같은 사건. 그 탐색 요청에는 Bearer가 붙지 않는다. **시작 직후에만** 나오면 정상 |
-| tunnel-client 로그 | `server/discover` 400 | MCP 표준이 아닌 OpenAI 확장 메서드라 우리 서버가 모른다. ChatGPT는 곧바로 표준 방식으로 되돌아간다 |
+| tunnel-client log | `OAuth discovery failed` — `invalid character '<'` | tunnel-client probes `/.well-known/oauth-protected-resource`, but we are not an OAuth server so that path does not exist. Express returns an HTML 404 and the JSON parser trips on the `<` of `<!DOCTYPE` |
+| Audit log | 2-3 × `auth_failure` / `missing` | The same probes. They carry no Bearer header. **Normal if they only appear right after startup** |
+| tunnel-client log | `server/discover` 400 | An OpenAI extension method, not part of the MCP standard, so our server does not know it. ChatGPT falls back to the standard path immediately |
 
-구분법은 간단합니다 — **툴을 실제로 부른 뒤에도 `auth_failure` 가 계속 쌓이면** 진짜 문제이고,
-시작할 때만 몇 건 찍히고 그 뒤로 `tool_call` 이 정상적으로 이어지면 정상입니다.
+Telling them apart is simple: **if `auth_failure` keeps accumulating after tools
+have actually been called**, that is a real problem. A few at startup followed
+by normal `tool_call` entries is fine.
 
-### 로그가 너무 많으면
+### If the logs are too noisy
 
-`gpt-bridge.yaml` 에서 한 줄만 바꾸세요.
+One line in `gpt-bridge.yaml`:
 
 ```yaml
 log:
-  level: warn      # info → warn. 문제가 있을 때만 찍힌다
+  level: warn      # info -> warn. Only prints when something is wrong.
 ```
 
-기타 확인 지점:
+### Other things to check
 
-- `url` 이 `http://127.0.0.1:3737/mcp` — **경로 `/mcp` 까지** 있는지
-- `gptBridge.port` 를 바꿨다면 설정 파일의 `url` 도 같이 고쳐야 합니다
-- VS Code에서 **폴더를 열지 않았으면** 파일 툴이 동작하지 않습니다
+- Does `url` end in **`/mcp`** — `http://127.0.0.1:3737/mcp`, not just the port
+- If you changed `gptBridge.port`, update `url` in the config file to match
+- File tools do nothing unless **a folder is open** in VS Code
 
 ---
 
-## 알아 둘 것
+## Things to know
 
-**토큰을 재발급하면 설정 파일도 같이 고쳐야 합니다.**
-`GPT Bridge: 토큰 재발급`을 하면 확장은 옛 토큰을 즉시 무효화하는데 터널은 계속
-옛 값을 보내서 모든 요청이 401이 됩니다. 로그에 `mismatch`가 쌓이면 이걸 의심하세요.
+**Regenerating the token means updating the config file too.**
+`GPT Bridge: Regenerate token` invalidates the old token immediately, but the
+tunnel keeps sending the old value, so every request returns 401. If `mismatch`
+entries pile up in the log, this is why.
 
-**tunnel-client 버전을 함부로 올리지 마세요.**
-1.0 이전이라 설정 키 이름이나 동작이 바뀔 수 있습니다. 잘 되는 버전을 그대로 두고,
-갑자기 안 되면 버전이 올라간 것을 먼저 의심하세요. 이 확장이 cloudflared를
-`2026.7.3`으로 고정해 둔 것과 같은 이유입니다.
+**Do not upgrade tunnel-client casually.**
+It is pre-1.0, so config key names and behaviour can change. Stay on a version
+that works, and if things suddenly break, suspect a version bump first. This is
+the same reason the extension pins cloudflared to `2026.7.3`.
 
-**비용은 확인되지 않았습니다.**
-OpenAI 공식 가격표에 tunnel 항목이 없고 가이드 문서에도 언급이 없습니다. 터널
-생성과 클라이언트 다운로드 단계에서는 과금 요청이 없었습니다. 나중에 청구가
-붙는다면 `gptBridge.tunnel.provider` 를 `cloudflare` 로 되돌리는 경로가 살아 있습니다.
+**Cost is unconfirmed.**
+The tunnel does not appear in OpenAI's published pricing and the guides do not
+mention it. Creating a tunnel, downloading the client and connecting produced no
+billing prompt. If charges do appear later, switching
+`gptBridge.tunnel.provider` back to `cloudflare` remains available.
 
-**이 방식이 Cloudflare 경로보다 안전합니다.**
-Cloudflare로 하면 워크스페이스가 공개 HTTPS 주소로 열리고 토큰을 ChatGPT 설정에
-붙여넣어야 합니다. 이 방식은 공개 주소가 생기지 않고 **토큰이 PC를 벗어나지
-않습니다.** README 보안 절이 감수 사항으로 적어 둔 "토큰 유출 = 전체 노출"의
-노출면이 그만큼 줄어듭니다.
+**This is safer than the Cloudflare route.**
+With Cloudflare, the workspace is exposed at a public HTTPS address and the
+token has to be pasted into the ChatGPT connector settings. This way no public
+address exists and **the token never leaves the PC.** The exposure that the
+README's security section accepts as a trade-off — "token leak means full
+exposure" — shrinks accordingly.
 
 ---
 
-## 다른 PC에 설치할 때 체크리스트
+## Checklist for installing on another PC
 
 ```
-[ ] git clone → npm install → npm run setup   (그 PC에서 직접. ripgrep 때문)
-[ ] OpenAI에 터널 만들기 → 터널ID 확보      (PC마다 따로 권장)
-[ ] API 키 발급 (권한 All, 이 용도 전용으로)
-[ ] tunnel-client 내려받기 + 해시 확인
-[ ] 탐색기로 압축 풀기 (저장소 밖)
-[ ] %APPDATA%\tunnel-client\gpt-bridge.yaml 작성
-[ ] VS Code: tunnel.provider=none → 서버 시작 → 토큰 복사
-[ ] 설정 파일에 값 3개 채우기
-[ ] 터널 시작.bat 만들고 더블클릭
-[ ] ChatGPT 커넥터 등록 (연결=터널, 인증=인증없음)
-[ ] 커스텀 지침 붙여넣기
-[ ] "프로젝트 구조 설명해줘" 로 동작 확인
+[ ] git clone -> npm install -> npm run setup   (on that machine; ripgrep)
+[ ] Create a tunnel on OpenAI -> note the tunnel ID   (one per machine)
+[ ] Create an API key (dedicated to this use)
+[ ] Download tunnel-client + verify the hash
+[ ] Extract it outside the repository
+[ ] Write %APPDATA%\tunnel-client\gpt-bridge.yaml with all three values
+[ ] VS Code: tunnel.provider=none -> Start server -> Copy auth token
+[ ] Create start-tunnel.bat and double-click it
+[ ] Register the connector in ChatGPT (Connection=Tunnel, Auth=None)
+[ ] Paste the custom instructions
+[ ] Verify with "Explain the structure of this project"
 ```

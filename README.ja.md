@@ -1,6 +1,6 @@
 <div align="right">
-  <a href="README.md">한국어</a> ·
-  <a href="README.en.md">English</a> ·
+  <a href="README.md">English</a> ·
+  <a href="README.kr.md">한국어</a> ·
   <b>日本語</b> ·
   <a href="README.zh-CN.md">简体中文</a>
 </div>
@@ -85,7 +85,7 @@ ChatGPT ──(認証: なし)──▶ OpenAI トンネル ◀──(外向き�
 公開アドレスは作られず、**トークンが PC の外に出ることもありません。**
 
 以下は要約です。画面ごとの詳しい手順とトラブルシューティングは
-[`TUNNEL_SETUP.md`](./TUNNEL_SETUP.md) にあります。
+[`TUNNEL_SETUP.md`](./TUNNEL_SETUP.md)（英語）にあります。
 
 **まず 3 つの値を集め、5 のステップで設定ファイルに一度でまとめて記入します。**
 メモ帳などに控えておいてください。
@@ -118,8 +118,8 @@ VS Code で**作業するフォルダを開いてから**:
 
 1. `Ctrl+,` → `gptBridge.tunnel.provider` を検索 → **`none`** に変更
    （拡張機能が独自のトンネルを起動しないようにします）
-2. `Ctrl+Shift+P` → **`GPT Bridge: 서버 시작`**（サーバー開始）
-3. `Ctrl+Shift+P` → **`GPT Bridge: 인증 토큰 복사`**（認証トークンをコピー）
+2. `Ctrl+Shift+P` → **`GPT Bridge: Start server`**
+3. `Ctrl+Shift+P` → **`GPT Bridge: Copy auth token`**
 
 64 文字の文字列がクリップボードに入ります。**控えておいてください。**
 
@@ -250,7 +250,7 @@ tunnel-client run --profile gpt-bridge                # 起動（ウィンドウ
 
 ### 8. 指示文を設定する
 
-`Ctrl+Shift+P` → **`GPT Bridge: ChatGPT 지침 복사`**（ChatGPT 指示をコピー）を実行し、
+`Ctrl+Shift+P` → **`GPT Bridge: Copy ChatGPT instructions`**を実行し、
 ChatGPT に貼り付けます。
 
 **事実上必須です。** GPT は明示的に指示されない限り、カスタムツールをあまり
@@ -264,7 +264,7 @@ ChatGPT に貼り付けます。
 
 ### 毎回の起動手順
 
-1. VS Code → `GPT Bridge: 서버 시작`
+1. VS Code → `GPT Bridge: Start server`
 2. `tunnel-client run --profile gpt-bridge`
 
 ---
@@ -287,7 +287,7 @@ ChatGPT に貼り付けます。
   JSONL で記録します。
 
 トークンが漏れればワークスペース全体が開きます。これは受け入れた前提であり、
-対応は `GPT Bridge: 토큰 재발급`（トークン再発行）です。再発行したら設定ファイルの
+対応は `GPT Bridge: Regenerate token`です。再発行したら設定ファイルの
 `Authorization` も併せて更新してください。
 
 ## 設定
