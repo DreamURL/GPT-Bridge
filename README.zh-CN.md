@@ -125,8 +125,18 @@ shasum -a 256 "~/Downloads/tunnel-client-v0.0.11-windows-amd64.zip"
 
 ### 4. 编写配置文件
 
-`%APPDATA%\tunnel-client\gpt-bridge.yaml`
-（macOS / Linux 为 `~/.config/tunnel-client/gpt-bridge.yaml`）
+**先自己创建文件夹。** `tunnel-client` 还从未运行过，所以什么都还不存在。
+
+`Win + R` → `%APPDATA%` → 在打开的文件夹里**右键 → 新建 → 文件夹** →
+命名为 **`tunnel-client`**。把下面的内容保存到其中，文件名为 `gpt-bridge.yaml`。
+
+```
+Windows       %APPDATA%\tunnel-client\gpt-bridge.yaml
+macOS/Linux   ~/.config/tunnel-client/gpt-bridge.yaml
+```
+
+> 用记事本保存时，请把**保存类型改为「所有文件」**。否则会变成
+> `gpt-bridge.yaml.txt`，`tunnel-client` 找不到它。
 
 ```yaml
 config_version: 1

@@ -130,8 +130,20 @@ Stop if the values differ. If they match, extract anywhere **outside the reposit
 
 ### 4. Write the config file
 
-`%APPDATA%\tunnel-client\gpt-bridge.yaml`
-(on macOS/Linux: `~/.config/tunnel-client/gpt-bridge.yaml`)
+**Create the folder yourself first.** `tunnel-client` has never run, so nothing
+exists yet.
+
+`Win + R` → `%APPDATA%` → in the folder that opens, **right-click → New →
+Folder** → name it **`tunnel-client`**. Save the content below inside it as
+`gpt-bridge.yaml`.
+
+```
+Windows       %APPDATA%\tunnel-client\gpt-bridge.yaml
+macOS/Linux   ~/.config/tunnel-client/gpt-bridge.yaml
+```
+
+> When saving from Notepad, set **Save as type to `All Files`**. Otherwise you
+> get `gpt-bridge.yaml.txt` and `tunnel-client` will not find it.
 
 ```yaml
 config_version: 1

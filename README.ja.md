@@ -131,8 +131,20 @@ shasum -a 256 "~/Downloads/tunnel-client-v0.0.11-windows-amd64.zip"
 
 ### 4. 設定ファイルを作る
 
-`%APPDATA%\tunnel-client\gpt-bridge.yaml`
-（macOS・Linux は `~/.config/tunnel-client/gpt-bridge.yaml`）
+**まずフォルダを自分で作成します。** `tunnel-client` をまだ一度も実行していないため、
+何も用意されていません。
+
+`Win + R` → `%APPDATA%` → 開いたフォルダ内で**右クリック → 新規作成 →
+フォルダー** → 名前を **`tunnel-client`** に。その中に下記の内容を
+`gpt-bridge.yaml` として保存します。
+
+```
+Windows       %APPDATA%\tunnel-client\gpt-bridge.yaml
+macOS/Linux   ~/.config/tunnel-client/gpt-bridge.yaml
+```
+
+> メモ帳で保存する際は**ファイルの種類を「すべてのファイル」に**してください。
+> そのままだと `gpt-bridge.yaml.txt` になり、`tunnel-client` が見つけられません。
 
 ```yaml
 config_version: 1
