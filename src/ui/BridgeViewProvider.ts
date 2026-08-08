@@ -199,7 +199,6 @@ export class BridgeViewProvider implements vscode.WebviewViewProvider {
   button.primary:hover { background: var(--vscode-button-hoverBackground); }
   button.block { display: block; width: 100%; margin-bottom: 6px; }
   select, input[type=checkbox] { font-family: inherit; font-size: inherit; }
-  select.lang { width: auto; min-width: 96px; padding: 2px 4px; font-size: 11px; }
   select {
     width: 100%; padding: 3px 4px;
     color: var(--vscode-dropdown-foreground);
@@ -229,12 +228,6 @@ export class BridgeViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
   <section>
-    <div class="row between" style="margin-bottom:8px">
-      <span class="muted" style="font-size:11px">${t('panel.language')}</span>
-      <select id="language" class="lang" title="${t('panel.language')}">
-        ${LANGUAGES.map((code) => languageOption(code, config.language)).join('')}
-      </select>
-    </div>
     <div class="row between">
       <span class="status"><span class="dot"></span>${escapeHtml(describe(state))}</span>
       <button class="${running ? '' : 'primary'}" data-command="${running ? 'gptBridge.stop' : 'gptBridge.start'}">
@@ -296,6 +289,14 @@ export class BridgeViewProvider implements vscode.WebviewViewProvider {
     </div>
     <p class="muted" style="margin:6px 0 0; line-height:1.5">
       ${escapeHtml(t('panel.autoSaveHint'))}
+    </p>
+
+    <label class="field" for="language">${t('panel.language')}</label>
+    <select id="language">
+      ${LANGUAGES.map((code) => languageOption(code, config.language)).join('')}
+    </select>
+    <p class="muted" style="margin:6px 0 0; line-height:1.5">
+      ${escapeHtml(t('panel.languageHint'))}
     </p>
   </section>
 
