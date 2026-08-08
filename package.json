@@ -103,8 +103,8 @@
             "cloudflare",
             "none"
           ],
-          "default": "cloudflare",
-          "description": "Tunnel provider used to expose the server. Use \"none\" when you run an external tunnel such as OpenAI Secure MCP Tunnel, or to stay local-only."
+          "default": "none",
+          "description": "Tunnel provider the extension starts on its own. Default \"none\": the extension does not create a tunnel, which is right when you use an external tunnel such as OpenAI Secure MCP Tunnel, or want to stay local-only. Set \"cloudflare\" to have the extension run cloudflared and obtain a public URL."
         },
         "gptBridge.tunnel.hostname": {
           "type": "string",

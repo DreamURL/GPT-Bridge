@@ -116,8 +116,8 @@ ChatGPT ──(認証: なし)──▶ OpenAI トンネル ◀──(外向き�
 
 VS Code で**作業するフォルダを開いてから**:
 
-1. `Ctrl+,` → `gptBridge.tunnel.provider` を検索 → **`none`** に変更
-   （拡張機能が独自のトンネルを起動しないようにします）
+1. `Ctrl+,` → `gptBridge.tunnel.provider` を検索 → **`none`** であることを確認
+   （既定値です。拡張機能が独自のトンネルを起動しないようにします）
 2. `Ctrl+Shift+P` → **`GPT Bridge: Start server`**
 3. `Ctrl+Shift+P` → **`GPT Bridge: Copy auth token`**
 
@@ -315,7 +315,7 @@ ChatGPT に貼り付けます。
 |---|---|---|
 | `gptBridge.port` | `3737` | サーバーのポート |
 | `gptBridge.autoStart` | `false` | VS Code 起動時に自動実行 |
-| `gptBridge.tunnel.provider` | `cloudflare` | 外部トンネル使用時は `none` |
+| `gptBridge.tunnel.provider` | `none` | `none` なら拡張機能はトンネルを作りません（既定）。`cloudflare` なら cloudflared で公開 URL を取得します |
 | `gptBridge.approval.mode` | `always` | `always` / `session` / `pattern` |
 | `gptBridge.autoSave` | `false` | 無効のままなら `Ctrl+S` までディスクは安全 |
 | `gptBridge.maxReadBytes` | `1048576` | 一度に読む最大バイト数 |

@@ -113,8 +113,8 @@ ChatGPT ──(인증: 없음)──▶ OpenAI 터널 ◀──(나가는 연결
 
 VS Code에서 **작업할 폴더를 열고**:
 
-1. `Ctrl+,` → `gptBridge.tunnel.provider` 검색 → **`none`** 으로 변경
-   (확장이 자체 터널을 띄우지 않게 합니다)
+1. `Ctrl+,` → `gptBridge.tunnel.provider` 검색 → **`none`** 인지 확인
+   (기본값입니다. 확장이 자체 터널을 띄우지 않게 합니다)
 2. `Ctrl+Shift+P` → **`GPT Bridge: Start server`**
 3. `Ctrl+Shift+P` → **`GPT Bridge: Copy auth token`**
 
@@ -307,7 +307,7 @@ cd "<압축을 푼 폴더>"
 |---|---|---|
 | `gptBridge.port` | `3737` | 서버 포트 |
 | `gptBridge.autoStart` | `false` | VS Code 시작 시 자동 실행 |
-| `gptBridge.tunnel.provider` | `cloudflare` | 외부 터널 사용 시 `none` |
+| `gptBridge.tunnel.provider` | `none` | `none`이면 확장이 터널을 만들지 않습니다(기본). `cloudflare`면 cloudflared로 공개 URL을 얻습니다 |
 | `gptBridge.approval.mode` | `always` | `always` / `session` / `pattern` |
 | `gptBridge.autoSave` | `false` | 끄면 `Ctrl+S` 전까지 디스크 안전 |
 | `gptBridge.maxReadBytes` | `1048576` | 한 번에 읽을 최대 바이트 |

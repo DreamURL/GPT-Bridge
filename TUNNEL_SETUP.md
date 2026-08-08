@@ -154,11 +154,11 @@ This is the ID card `tunnel-client` shows OpenAI to prove who it is.
 
 Do this in the VS Code window that has **your working folder open**.
 
-1. `Ctrl + ,` → search `gptBridge.tunnel.provider` → set it to **`none`**
+1. `Ctrl + ,` → search `gptBridge.tunnel.provider` → confirm it is **`none`**
 
-   > Left at the default `cloudflare`, the extension starts a tunnel of its own.
-   > You do not need that with the OpenAI tunnel, and it creates a public
-   > address, which is worse.
+   > `none` is the default, so normally there is nothing to change. Set to
+   > `cloudflare`, the extension would start a tunnel of its own — unnecessary
+   > alongside the OpenAI tunnel, and it creates a public address, which is worse.
 
 2. `Ctrl + Shift + P` → **`GPT Bridge: Start server`**
 3. `Ctrl + Shift + P` → **`GPT Bridge: Copy auth token`**

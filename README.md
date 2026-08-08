@@ -115,8 +115,8 @@ tunnel-specific scope. Copy the `sk-` value — **it is shown only once.**
 
 In VS Code, **open the folder you want to work in**, then:
 
-1. `Ctrl+,` → search `gptBridge.tunnel.provider` → set it to **`none`**
-   (stops the extension from starting a tunnel of its own)
+1. `Ctrl+,` → search `gptBridge.tunnel.provider` → confirm it is **`none`**
+   (the default; it stops the extension from starting a tunnel of its own)
 2. `Ctrl+Shift+P` → **`GPT Bridge: Start server`**
 3. `Ctrl+Shift+P` → **`GPT Bridge: Copy auth token`**
 
@@ -314,7 +314,7 @@ update `Authorization` in the config file too.
 |---|---|---|
 | `gptBridge.port` | `3737` | Server port |
 | `gptBridge.autoStart` | `false` | Start automatically with VS Code |
-| `gptBridge.tunnel.provider` | `cloudflare` | Set to `none` when using an external tunnel |
+| `gptBridge.tunnel.provider` | `none` | `none` = the extension starts no tunnel (default). `cloudflare` = run cloudflared for a public URL |
 | `gptBridge.approval.mode` | `always` | `always` / `session` / `pattern` |
 | `gptBridge.autoSave` | `false` | Leave off to keep disk safe until `Ctrl+S` |
 | `gptBridge.maxReadBytes` | `1048576` | Max bytes per read |

@@ -110,8 +110,8 @@ ChatGPT ──(认证：无)──▶ OpenAI 隧道 ◀──(出站连接)─�
 
 在 VS Code 中**打开要工作的文件夹**，然后：
 
-1. `Ctrl+,` → 搜索 `gptBridge.tunnel.provider` → 改为 **`none`**
-   （让扩展不再自行启动隧道）
+1. `Ctrl+,` → 搜索 `gptBridge.tunnel.provider` → 确认为 **`none`**
+   （这是默认值，让扩展不再自行启动隧道）
 2. `Ctrl+Shift+P` → **`GPT Bridge: Start server`**
 3. `Ctrl+Shift+P` → **`GPT Bridge: Copy auth token`**
 
@@ -302,7 +302,7 @@ cd "<解压到的文件夹>"
 |---|---|---|
 | `gptBridge.port` | `3737` | 服务器端口 |
 | `gptBridge.autoStart` | `false` | 随 VS Code 自动启动 |
-| `gptBridge.tunnel.provider` | `cloudflare` | 使用外部隧道时设为 `none` |
+| `gptBridge.tunnel.provider` | `none` | `none` 表示扩展不创建隧道（默认）。`cloudflare` 则运行 cloudflared 获取公开 URL |
 | `gptBridge.approval.mode` | `always` | `always` / `session` / `pattern` |
 | `gptBridge.autoSave` | `false` | 保持关闭可确保 `Ctrl+S` 前磁盘安全 |
 | `gptBridge.maxReadBytes` | `1048576` | 单次读取的最大字节数 |

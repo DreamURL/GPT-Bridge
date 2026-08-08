@@ -49,13 +49,13 @@ export function readConfig(): BridgeConfig {
   const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
 
   const rawApprovalMode = cfg.get<string>('approval.mode', 'always');
-  const rawProvider = cfg.get<string>('tunnel.provider', 'cloudflare');
+  const rawProvider = cfg.get<string>('tunnel.provider', 'none');
   const rawLanguage = cfg.get<string>('language', 'en');
 
   return {
     port: cfg.get<number>('port', 3737),
     autoStart: cfg.get<boolean>('autoStart', false),
-    tunnelProvider: isTunnelProvider(rawProvider) ? rawProvider : 'cloudflare',
+    tunnelProvider: isTunnelProvider(rawProvider) ? rawProvider : 'none',
     tunnelHostname: normalizeOptional(cfg.get<string>('tunnel.hostname', '')),
     approvalMode: isApprovalMode(rawApprovalMode) ? rawApprovalMode : 'always',
     autoApprovePatterns: stringArray(cfg.get<unknown[]>('approval.autoApprovePatterns', [])),

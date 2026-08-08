@@ -184,6 +184,26 @@ export class BridgeViewProvider implements vscode.WebviewViewProvider {
     border: 1px solid var(--vscode-inputValidation-infoBorder);
     border-radius: 2px; padding: 6px 8px; margin-top: 8px; line-height: 1.5;
   }
+  details.notice { border-radius: 2px; padding: 6px 8px; margin-top: 8px; line-height: 1.5; }
+  details.notice > summary {
+    cursor: pointer; list-style: none; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+  }
+  details.notice > summary::-webkit-details-marker { display: none; }
+  /* 접힘/펼침을 텍스트로 드러낸다. 화살표만으로는 눌러야 하는 줄인지 모른다. */
+  details.notice > summary::before { content: '▸'; flex: none; font-size: 10px; }
+  details.notice[open] > summary::before { content: '▾'; }
+  details.notice > p { margin: 6px 0 0; }
+  details.notice.warn {
+    color: var(--vscode-inputValidation-warningForeground, var(--vscode-foreground));
+    background: var(--vscode-inputValidation-warningBackground);
+    border: 1px solid var(--vscode-inputValidation-warningBorder);
+  }
+  details.notice.info {
+    color: var(--vscode-inputValidation-infoForeground, var(--vscode-foreground));
+    background: var(--vscode-inputValidation-infoBackground);
+    border: 1px solid var(--vscode-inputValidation-infoBorder);
+  }
   label.field { display: block; font-size: 11px; margin: 10px 0 3px; color: var(--vscode-descriptionForeground); }
   button {
     padding: 4px 10px; border: none; border-radius: 2px; cursor: pointer;
@@ -257,17 +277,17 @@ export class BridgeViewProvider implements vscode.WebviewViewProvider {
 
     ${
       isLocalOnly
-        ? `<div class="warn">${t('panel.localOnly')}</div>`
+        ? notice('warn', t('panel.localOnlySummary'), t('panel.localOnly'), true)
         : ''
     }
     ${
       isExternalTunnel
-        ? `<div class="info">${t('panel.externalTunnel')}</div>`
+        ? notice('info', t('panel.externalTunnelSummary'), t('panel.externalTunnel'), false)
         : ''
     }
     ${
       quickTunnel
-        ? `<div class="warn">${t('panel.quickTunnel')}</div>`
+        ? notice('warn', t('panel.quickTunnelSummary'), t('panel.quickTunnel'), false)
         : ''
     }
     <p class="muted" style="margin:10px 0 0; line-height:1.5">
@@ -343,6 +363,22 @@ export class BridgeViewProvider implements vscode.WebviewViewProvider {
 
 function approvalOption(value: ApprovalMode, label: string, current: ApprovalMode): string {
   return `<option value="${value}"${value === current ? ' selected' : ''}>${label}</option>`;
+}
+
+/**
+ * 접을 수 있는 안내 상자.
+ *
+ * 상태가 정상인데도 긴 설명이 항상 펼쳐져 있으면 패널의 다른 정보를 밀어낸다.
+ * 제목만 보이게 접어 두되, 진짜 문제(터널 실패)는 펼친 채로 둔다 — 경고를
+ * 접어 숨기면 알아차리지 못한다.
+ */
+function notice(kind: 'warn' | 'info', summary: string, body: string, open: boolean): string {
+  return (
+    `<details class="notice ${kind}"${open ? ' open' : ''}>` +
+    `<summary>${escapeHtml(summary)}</summary>` +
+    `<p>${body}</p>` +
+    `</details>`
+  );
 }
 
 /** 언어 이름은 그 언어로 적는다. 못 읽는 언어로 표시하면 되돌아올 수 없다. */

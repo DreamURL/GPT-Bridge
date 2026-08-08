@@ -58,6 +58,9 @@ const en = {
   'panel.language': 'Language',
   'panel.languageHint':
     'Applies to this panel, the status bar and dialogs. Logs and tool descriptions stay in English. Also available in Settings (Ctrl+,) as gptBridge.language.',
+  'panel.localOnlySummary': 'No tunnel connected - local only',
+  'panel.externalTunnelSummary': 'Local endpoint (external tunnel expected)',
+  'panel.quickTunnelSummary': 'Quick Tunnel - URL changes on restart',
   'panel.localOnly':
     'No tunnel is connected, so only the local address works. ChatGPT on the web cannot reach it — use a local client such as MCP Inspector.',
   'panel.externalTunnel':
@@ -157,6 +160,9 @@ const ko: Record<Key, string> = {
   'panel.language': '언어',
   'panel.languageHint':
     '이 패널과 상태바, 대화 상자에 적용됩니다. 로그와 툴 설명은 영어로 유지됩니다. 설정(Ctrl+,)의 gptBridge.language에서도 바꿀 수 있습니다.',
+  'panel.localOnlySummary': '터널 미연결 - 로컬 전용',
+  'panel.externalTunnelSummary': '로컬 엔드포인트 (외부 터널 사용 구성)',
+  'panel.quickTunnelSummary': 'Quick Tunnel - 재시작마다 URL 변경',
   'panel.localOnly':
     '터널이 연결되지 않아 로컬 주소만 사용할 수 있습니다. ChatGPT 웹에서는 접근할 수 없고, MCP Inspector 같은 로컬 도구로만 확인할 수 있습니다.',
   'panel.externalTunnel':
@@ -254,6 +260,9 @@ const ja: Record<Key, string> = {
   'panel.language': '言語',
   'panel.languageHint':
     'このパネル・ステータスバー・ダイアログに適用されます。ログとツールの説明は英語のままです。設定（Ctrl+,）の gptBridge.language でも変更できます。',
+  'panel.localOnlySummary': 'トンネル未接続 - ローカルのみ',
+  'panel.externalTunnelSummary': 'ローカルエンドポイント（外部トンネル構成）',
+  'panel.quickTunnelSummary': 'Quick Tunnel - 再起動ごとに URL が変わる',
   'panel.localOnly':
     'トンネルが接続されていないため、ローカルアドレスのみ利用できます。ChatGPT のウェブからは到達できず、MCP Inspector のようなローカルツールでのみ確認できます。',
   'panel.externalTunnel':
@@ -351,6 +360,9 @@ const zh: Record<Key, string> = {
   'panel.language': '语言',
   'panel.languageHint':
     '适用于此面板、状态栏和对话框。日志与工具说明保持英文。也可在设置（Ctrl+,）的 gptBridge.language 中修改。',
+  'panel.localOnlySummary': '隧道未连接 - 仅本地',
+  'panel.externalTunnelSummary': '本地端点（使用外部隧道）',
+  'panel.quickTunnelSummary': 'Quick Tunnel - 每次重启 URL 都会变',
   'panel.localOnly':
     '隧道未连接，只能使用本地地址。ChatGPT 网页端无法访问，只能用 MCP Inspector 这类本地工具验证。',
   'panel.externalTunnel':
@@ -444,6 +456,9 @@ const es: Record<Key, string> = {
   'panel.language': 'Idioma',
   'panel.languageHint':
     'Se aplica a este panel, la barra de estado y los diálogos. Los registros y las descripciones de herramientas siguen en inglés. También está en Ajustes (Ctrl+,) como gptBridge.language.',
+  'panel.localOnlySummary': 'Sin túnel - solo local',
+  'panel.externalTunnelSummary': 'Punto final local (túnel externo)',
+  'panel.quickTunnelSummary': 'Quick Tunnel: la URL cambia al reiniciar',
   'panel.localOnly':
     'No hay ningún túnel conectado, así que solo funciona la dirección local. ChatGPT en la web no puede alcanzarla; usa una herramienta local como MCP Inspector.',
   'panel.externalTunnel':
