@@ -11,34 +11,35 @@ import {
 } from '../../workspace/textEdit';
 import { errorResult, textResult, type ToolContext, type ToolResult } from './types';
 
-export const EDIT_FILE_DESCRIPTION = `기존 파일의 일부를 바꾼다. 파일 수정의 기본 도구다.
+export const EDIT_FILE_DESCRIPTION = `Replace part of an existing file. This is the primary editing tool.
 
-**기존 파일을 수정할 때는 write_file 대신 반드시 이 툴을 사용한다.**
-write_file은 파일 전체를 덮어써서 관계없는 부분까지 날아간다.
+**To modify an existing file, always use this tool instead of write_file.**
+write_file overwrites the whole file and destroys unrelated parts.
 
-언제 쓰나: 이미 있는 파일의 특정 부분을 고칠 때.
-언제 쓰지 않나: 새 파일을 만들 때는 write_file을 쓴다.
+When to use: changing a specific part of a file that already exists.
+When not to use: creating a new file - use write_file for that.
 
-호출 순서: read_file로 현재 내용 확인 → edit_file → get_diagnostics로 새 에러 확인
+Call order: read_file to see current content -> edit_file -> get_diagnostics
 
-수정은 디스크가 아니라 **에디터 버퍼**에 적용된다. 사용자가 Ctrl+Z로 되돌릴 수
-있고, 저장 전까지 디스크는 변경되지 않는다. 사용자 승인이 필요하다.
+Edits are applied to the **editor buffer**, not to disk. The user can undo them
+with Ctrl+Z and disk stays unchanged until they save. Requires user approval.
 
-파라미터
-  path        루트 기준 상대 경로. 예: "src/app.ts"
-  old_string  바꿀 대상. **파일 안에서 정확히 1회만 등장해야 한다.**
-              read_file이 붙여 준 줄 번호 접두사("  12│ ")는 빼고 보낼 것.
-              여러 번 등장하면 앞뒤 줄을 더 포함해 고유하게 만든다.
-  new_string  바꿀 내용. 빈 문자열이면 해당 부분이 삭제된다.
+Parameters
+  path        Path relative to the workspace root. Example: "src/app.ts"
+  old_string  The text to replace. **It must appear exactly once in the file.**
+              Strip the line-number prefix that read_file adds before sending.
+              If it appears more than once, include surrounding lines to make it unique.
+  new_string  The replacement. An empty string deletes the matched text.
 
-줄바꿈은 파일의 스타일(LF/CRLF)에 맞춰 자동으로 변환되므로 \\n으로 보내면 된다.`;
+Line endings are converted to the file's own style (LF/CRLF) automatically, so
+just send \n.`;
 
 export const editFileSchema = {
-  path: z.string().describe('루트 기준 상대 경로. 예: "src/app.ts"'),
+  path: z.string().describe('Path relative to the workspace root. Example: "src/app.ts"'),
   old_string: z
     .string()
-    .describe('바꿀 대상. 파일 안에서 정확히 1회만 등장해야 한다. 줄 번호 접두사는 제외할 것'),
-  new_string: z.string().describe('바꿀 내용. 빈 문자열이면 삭제된다')
+    .describe('Text to replace. Must appear exactly once in the file. Strip the line-number prefix'),
+  new_string: z.string().describe('Replacement text. An empty string deletes the match')
 };
 
 export interface EditFileArgs {
@@ -56,7 +57,7 @@ export async function editFileTool(ctx: ToolContext, args: EditFileArgs): Promis
     document = await openDocument(uri);
   } catch {
     return errorResult(
-      `파일을 열 수 없습니다: ${resolved.relative}. 새 파일이라면 write_file을 사용하세요.`
+      `Cannot open file: ${resolved.relative}. Use write_file if this is a new file.`
     );
   }
 
@@ -65,18 +66,20 @@ export async function editFileTool(ctx: ToolContext, args: EditFileArgs): Promis
   const match = findUniqueOccurrence(text, args.old_string, documentEol);
 
   if (match.kind === 'empty') {
-    return errorResult('old_string이 비어 있습니다. 바꿀 대상을 지정하세요.');
+    return errorResult('old_string is empty. Specify the text to replace.');
   }
   if (match.kind === 'none') {
     return errorResult(
-      `old_string을 찾을 수 없습니다: ${resolved.relative}\n` +
-        `read_file로 현재 내용을 다시 확인하세요. 줄 번호 접두사("  12│ ")를 포함해 보내지 않았는지도 확인하세요.`
+      `old_string was not found in ${resolved.relative}
+` +
+        `Call read_file to re-check the content, and do not include the line-number prefix.`
     );
   }
   if (match.kind === 'ambiguous') {
     return errorResult(
-      `old_string이 고유하지 않습니다 (${match.count}회 이상 등장): ${resolved.relative}\n` +
-        `앞뒤 줄을 더 포함해 한 곳만 가리키도록 만드세요.`
+      `old_string is not unique (${match.count} or more matches) in ${resolved.relative}
+` +
+        `Include more surrounding lines so it matches exactly one place.`
     );
   }
 
@@ -100,8 +103,8 @@ export async function editFileTool(ctx: ToolContext, args: EditFileArgs): Promis
   if (decision !== 'approved') {
     return errorResult(
       decision === 'expired'
-        ? '승인 대기 시간이 지나 수정을 적용하지 않았습니다. 다시 요청하세요.'
-        : '사용자가 수정을 거부했습니다.'
+        ? 'The approval window expired, so the edit was not applied. Ask again.'
+        : 'The user rejected the edit.'
     );
   }
 
@@ -112,8 +115,9 @@ export async function editFileTool(ctx: ToolContext, args: EditFileArgs): Promis
   const recheck = findUniqueOccurrence(currentText, args.old_string, documentEol);
   if (recheck.kind !== 'found') {
     return errorResult(
-      `승인을 기다리는 동안 파일이 변경되었습니다: ${resolved.relative}\n` +
-        `read_file로 현재 내용을 다시 확인한 뒤 재시도하세요.`
+      `The file changed while waiting for approval: ${resolved.relative}
+` +
+        `Call read_file to re-check the current content, then try again.`
     );
   }
 
@@ -126,16 +130,17 @@ export async function editFileTool(ctx: ToolContext, args: EditFileArgs): Promis
 
   const applied = await vscode.workspace.applyEdit(edit);
   if (!applied) {
-    return errorResult(`수정을 적용하지 못했습니다: ${resolved.relative}`);
+    return errorResult(`Failed to apply the edit: ${resolved.relative}`);
   }
 
   const saved = await maybeAutoSave(ctx, uri);
   return textResult(
-    `${resolved.relative} 수정 완료 (+${summary.added} -${summary.removed}).\n` +
+    `Edited ${resolved.relative} (+${summary.added} -${summary.removed}).
+` +
       (saved
-        ? '자동 저장되어 디스크에 반영되었습니다.'
-        : '에디터 버퍼에만 적용되었습니다. 사용자가 저장하기 전까지 디스크는 변경되지 않습니다.') +
-      '\nget_diagnostics를 호출해 새 에러가 없는지 확인하세요.'
+        ? 'Auto-save is on, so the change was written to disk.'
+        : 'Applied to the editor buffer only. Disk stays unchanged until the user saves.') +
+      '\nCall get_diagnostics to check for new errors.'
   );
 }
 

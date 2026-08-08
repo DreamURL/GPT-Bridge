@@ -6,30 +6,27 @@ import { textResult, type ToolContext, type ToolResult } from './types';
 
 const MAX_ITEMS = 200;
 
-export const GET_DIAGNOSTICS_DESCRIPTION = `현재 워크스페이스의 타입 에러·린트 경고를 읽는다.
-VS Code의 언어 서버(TypeScript, ESLint 등)가 실제로 보고하고 있는 내용이다.
+export const GET_DIAGNOSTICS_DESCRIPTION = `Read type errors and lint warnings for the workspace.
 
-언제 쓰나: 파일을 수정한 직후에 **반드시**. 수정이 새 에러를 만들지 않았는지
-여기서 확인한다. 확인 없이 작업을 끝내지 말 것.
-작업을 시작할 때 기존 문제를 파악하는 용도로도 쓴다.
+**Call this after every edit** to confirm you did not introduce new errors.
+This is what makes editing here different from editing blind: the language
+server has already checked the code, so you can fix problems immediately.
 
-언제 쓰지 않나: 코드를 실행해 봐야 아는 런타임 오류는 여기 나오지 않는다.
+When to use: right after edit_file or write_file, and when the user asks what
+is broken.
 
-호출 순서: edit_file → get_diagnostics → (에러가 있으면) read_file → edit_file
+Call order: edit_file -> get_diagnostics -> fix anything new
 
-진단 정보는 언어 서버가 갱신하는 데 잠깐 시간이 걸린다. 수정 직후 결과가
-비어 있으면 한 번 더 호출해 볼 것.
-
-파라미터
-  path      특정 파일만 볼 때 지정. 생략하면 워크스페이스 전체
-  severity  "error" | "warning" | "all". 기본 "all"`;
+Parameters
+  path      Limit to one file. Omit for the whole workspace.
+  severity  "error" | "warning" | "all". Default "all"`;
 
 export const getDiagnosticsSchema = {
-  path: z.string().optional().describe('특정 파일만 볼 때 지정. 생략하면 워크스페이스 전체'),
+  path: z.string().optional().describe('Limit to one file. Omit for the whole workspace'),
   severity: z
     .enum(['error', 'warning', 'all'])
     .optional()
-    .describe('"error"는 에러만, "warning"은 경고 이상, "all"은 전부. 기본 "all"')
+    .describe('"error" for errors only, "warning" for warnings and above, "all" for everything. Default "all"')
 };
 
 export interface GetDiagnosticsArgs {
@@ -117,13 +114,13 @@ export async function getDiagnosticsTool(
     }
   }
 
-  const scope = args.path ?? '워크스페이스 전체';
-  const summary = `${scope} — 에러 ${errorCount}개, 경고 ${warningCount}개`;
+  const scope = args.path ?? 'the whole workspace';
+  const summary = `${scope} - ${errorCount} error(s), ${warningCount} warning(s)`;
 
   if (lines.length === 0) {
-    return textResult(`${summary}\n표시할 진단이 없습니다.`);
+    return textResult(`${summary}\nNo diagnostics to report.`);
   }
 
-  const notes = truncated ? [`\n${MAX_ITEMS}개까지만 표시했습니다. path로 범위를 좁히세요.`] : [];
+  const notes = truncated ? [`\nOnly the first ${MAX_ITEMS} are shown. Narrow the scope with path.`] : [];
   return textResult([summary, '', ...lines, ...notes].join('\n'));
 }

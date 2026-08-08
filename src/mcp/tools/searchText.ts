@@ -3,50 +3,52 @@ import { isListingExcluded } from '../../workspace/denyList';
 import type { SearchTruncation } from '../../workspace/ripgrep';
 import { errorResult, textResult, wrapFileContent, type ToolContext, type ToolResult } from './types';
 
-export const SEARCH_TEXT_DESCRIPTION = `워크스페이스 전체에서 텍스트를 찾는다.
+export const SEARCH_TEXT_DESCRIPTION = `Search for text across the whole workspace.
 
-언제 쓰나: 심볼·함수·문자열이 어디에 있는지 모를 때. 파일을 하나씩 열어 보는
-대신 이 툴로 위치를 먼저 특정한다. **이미 읽은 파일을 다시 통째로 읽는 대신
-이 툴로 고칠 지점을 찾는 것이 훨씬 싸다.**
+When to use: when you do not know where a symbol, function or string lives.
+Locate it with this instead of opening files one by one. **It is far cheaper to
+find the spot with this tool than to re-read a whole file you already read.**
 
-언제 쓰지 않나: 파일 경로를 이미 아는 경우에는 read_file이 낫다.
-파일 이름 자체를 찾을 때는 list_directory를 쓴다.
+When not to use: if you already know the path, read_file is better. To find a
+file by name, use list_directory.
 
-호출 순서: search_text로 위치 확인 → read_file로 그 범위만 확인 → edit_file
+Call order: search_text to locate -> read_file for that range -> edit_file
 
-검색은 대소문자를 구분한다. .gitignore 등재 파일과 node_modules는 제외된다.
+The search is case-sensitive. Files ignored by .gitignore and node_modules are excluded.
 
-결과가 상한에 걸리면 **전체 몇 건 중 몇 건인지** 함께 알려 준다. 찾던 것이
-안 보이는데 "전체 N건 중 일부"라고 나왔다면 아직 못 본 매치가 있다는 뜻이다.
-그때는 include로 좁히거나 max_results를 올려 다시 부른다.
+If the result hits a limit, the response tells you **how many matches there are
+in total**. If what you were looking for is missing and the header says only
+part of the total is shown, there are matches you have not seen: narrow the
+search with include, or raise max_results and call again.
 
-파라미터
-  query          찾을 문자열. 기본은 정규식이 아니라 그대로 매칭한다.
-  is_regex       true면 정규식으로 해석한다. 기본 false
-  include        대상을 좁히는 glob. 예: "src/**/*.ts"
-  max_results    최대 매치 수. 기본 50, 최대 500.
-                 흔한 단어를 찾을 때는 올리기 전에 include로 좁히는 편이 싸다.
-  context_lines  매치 줄 앞뒤로 함께 볼 줄 수. 0~5, 기본 2.
-                 **위치만 알면 될 때는 0을 쓴다.** 매치가 많을수록 차이가 크다.`;
+Parameters
+  query          Text to find. Treated literally, not as a regex, by default.
+  is_regex       true to interpret query as a regular expression. Default false
+  include        Glob narrowing the search. Example: "src/**/*.ts"
+  max_results    Maximum matches. Default 50, max 500.
+                 For a common word, narrowing with include is cheaper than raising this.
+  context_lines  Lines of context around each match. 0-5, default 2.
+                 **Use 0 when you only need the location.** The difference grows
+                 with the number of matches.`;
 
 export const searchTextSchema = {
-  query: z.string().min(1).describe('찾을 문자열. 예: "createServer"'),
-  is_regex: z.boolean().optional().describe('true면 정규식으로 해석한다. 기본 false'),
-  include: z.string().optional().describe('대상을 좁히는 glob. 예: "src/**/*.ts"'),
+  query: z.string().min(1).describe('Text to find. Example: "createServer"'),
+  is_regex: z.boolean().optional().describe('true to interpret query as a regular expression. Default false'),
+  include: z.string().optional().describe('Glob narrowing the search. Example: "src/**/*.ts"'),
   max_results: z
     .number()
     .int()
     .min(1)
     .max(500)
     .optional()
-    .describe('최대 매치 수. 기본 50, 최대 500'),
+    .describe('Maximum matches. Default 50, max 500'),
   context_lines: z
     .number()
     .int()
     .min(0)
     .max(5)
     .optional()
-    .describe('매치 줄 앞뒤 줄 수. 0~5, 기본 2. 위치만 알면 될 때는 0')
+    .describe('Lines of context around each match. 0-5, default 2. Use 0 when you only need the location')
 };
 
 export interface SearchTextArgs {
@@ -60,7 +62,7 @@ export interface SearchTextArgs {
 export async function searchTextTool(ctx: ToolContext, args: SearchTextArgs): Promise<ToolResult> {
   if (ctx.rg === undefined) {
     return errorResult(
-      'ripgrep 바이너리를 찾을 수 없어 검색 기능을 사용할 수 없습니다. 확장을 다시 설치하세요.'
+      'The ripgrep binary was not found, so search is unavailable. Rebuild and reinstall the extension.'
     );
   }
 
@@ -80,9 +82,9 @@ export async function searchTextTool(ctx: ToolContext, args: SearchTextArgs): Pr
   const suppressed = outcome.blocks.length - visible.length;
 
   if (visible.length === 0) {
-    const parts = [`"${args.query}"에 대한 매치가 없습니다.`];
+    const parts = [`No matches for "${args.query}".`];
     if (suppressed > 0) {
-      parts.push(`(${suppressed}개 파일은 접근이 차단되어 제외됨)`);
+      parts.push(`(${suppressed} file(s) excluded because access is blocked)`);
     }
     // 잘린 채로 0건이면 "없다"가 아니라 "여기까지는 없다"이다. 구분해야 한다.
     const cut = truncationNote(outcome.truncation, outcome.totalMatches, 0);
@@ -116,21 +118,21 @@ export async function searchTextTool(ctx: ToolContext, args: SearchTextArgs): Pr
     notes.push(cut);
   }
   if (suppressed > 0) {
-    notes.push(`${suppressed}개 파일은 접근이 차단되어 제외했습니다.`);
+    notes.push(`${suppressed} file(s) excluded because access is blocked.`);
   }
 
   const scope =
     outcome.truncation === 'none'
-      ? `${visible.length}개 파일에서 ${shown}건 매치`
-      : `전체 ${totalLabel(outcome.truncation, outcome.totalMatches)} 중 ${shown}건 표시, ${visible.length}개 파일`;
+      ? `${shown} match(es) in ${visible.length} file(s)`
+      : `showing ${shown} of ${totalLabel(outcome.truncation, outcome.totalMatches)} match(es) across ${visible.length} file(s)`;
 
-  const header = `"${args.query}" — ${scope} ('>' 표시가 매치 줄)`;
+  const header = `"${args.query}" - ${scope} ('>' marks matching lines)`;
   return textResult([header, ...rendered, ...notes].join('\n\n'));
 }
 
 /** rg를 끊은 경우 전체 건수는 하한일 뿐이다. 확정된 값처럼 보이면 안 된다. */
 function totalLabel(truncation: SearchTruncation, total: number): string {
-  return truncation === 'limit' ? `${total}건` : `${total}건 이상`;
+  return truncation === 'limit' ? `${total}` : `${total}+`;
 }
 
 /**
@@ -148,19 +150,19 @@ function truncationNote(
       return undefined;
     case 'limit':
       return (
-        `전체 ${total}건 중 ${shown}건만 보여 줍니다. 찾던 것이 없다면 아직 못 본 ` +
-        `매치가 ${total - shown}건 남아 있습니다. include로 대상을 좁히거나 ` +
-        `max_results를 올리세요(최대 500).`
+        `Showing ${shown} of ${total} matches. If what you wanted is missing, ` +
+        `${total - shown} match(es) remain unseen. Narrow the search with include, ` +
+        `or raise max_results (max 500).`
       );
     case 'timeout':
       return (
-        '검색이 10초를 넘겨 중단했습니다. 결과가 불완전하며 남은 건수를 알 수 없습니다. ' +
-        'include로 대상을 좁혀 다시 부르세요. max_results를 올려도 해결되지 않습니다.'
+        'The search was stopped after 10 seconds. Results are incomplete and the remaining count is unknown. ' +
+        'Narrow it with include and call again. Raising max_results will not help.'
       );
     case 'output':
       return (
-        '출력이 너무 커서 검색을 중단했습니다. 결과가 불완전하며 남은 건수를 알 수 없습니다. ' +
-        'context_lines를 0으로 낮추거나 include로 대상을 좁히세요.'
+        'The search was stopped because the output grew too large. Results are incomplete and the remaining count is unknown. ' +
+        'Lower context_lines to 0, or narrow the search with include.'
       );
   }
 }

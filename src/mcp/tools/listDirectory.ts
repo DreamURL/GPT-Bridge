@@ -6,23 +6,24 @@ import { errorResult, textResult, type ToolContext, type ToolResult } from './ty
 
 const MAX_ENTRIES = 1000;
 
-export const LIST_DIRECTORY_DESCRIPTION = `워크스페이스의 파일·디렉터리 목록을 본다.
+export const LIST_DIRECTORY_DESCRIPTION = `List files and directories in the workspace.
 
-언제 쓰나: 프로젝트 구조를 파악할 때, 파일 이름을 정확히 모를 때.
+When to use: to see the project layout, or to find a file by name.
+When not to use: to find where a string occurs, use search_text. To read a
+file's contents, use read_file.
 
-언제 쓰지 않나: 파일 내용이 필요하면 read_file, 특정 문자열을 찾으려면
-search_text를 쓴다. 목록을 훑어 내용을 추측하지 말 것.
+Start with depth 1 and drill into the subtrees you actually need. Listing
+everything at once wastes context.
 
-.gitignore에 등재된 파일과 node_modules는 결과에서 제외된다.
-자격증명 파일(.env, id_rsa 등)도 노출되지 않는다.
+Files ignored by .gitignore and node_modules are excluded.
 
-파라미터
-  path   루트 기준 상대 경로. 기본값 "." (루트)
-  depth  하위 몇 단계까지 볼지. 1~3, 기본 1`;
+Parameters
+  path   Path relative to the workspace root. Default "." (the root)
+  depth  How deep to descend (1-3, default 1)`;
 
 export const listDirectorySchema = {
-  path: z.string().optional().describe('루트 기준 상대 경로. 기본 "."'),
-  depth: z.number().int().min(1).max(3).optional().describe('하위 탐색 깊이 (1~3, 기본 1)')
+  path: z.string().optional().describe('Path relative to the workspace root. Default "."'),
+  depth: z.number().int().min(1).max(3).optional().describe('How deep to descend (1-3, default 1)')
 };
 
 export interface ListDirectoryArgs {
@@ -43,7 +44,7 @@ export async function listDirectoryTool(
 ): Promise<ToolResult> {
   if (ctx.rg === undefined) {
     return errorResult(
-      'ripgrep 바이너리를 찾을 수 없어 목록 기능을 사용할 수 없습니다. 확장을 다시 설치하세요.'
+      'The ripgrep binary was not found, so listing is unavailable. Rebuild and reinstall the extension.'
     );
   }
 
@@ -54,10 +55,10 @@ export async function listDirectoryTool(
   try {
     const stat = await vscode.workspace.fs.stat(uri);
     if (stat.type !== vscode.FileType.Directory) {
-      return errorResult(`${resolved.relative}은(는) 디렉터리가 아닙니다. read_file을 사용하세요.`);
+      return errorResult(`${resolved.relative} is not a directory. Use read_file instead.`);
     }
   } catch {
-    return errorResult(`디렉터리를 찾을 수 없습니다: ${resolved.relative || '.'}`);
+    return errorResult(`Directory not found: ${resolved.relative || '.'}`);
   }
 
   // rg --files는 .gitignore를 존중한다. workspace.findFiles는 존중하지 않는다.
@@ -126,23 +127,23 @@ export async function listDirectoryTool(
   );
 
   if (withSizes.length === 0) {
-    return textResult(`${base || '.'} — 표시할 항목이 없습니다.`);
+    return textResult(`${base || '.'} - nothing to show.`);
   }
 
   const lines = withSizes.map((entry) =>
     entry.isDirectory
-      ? `  dir   ${entry.name}/  (${entry.childCount}개 항목)`
+      ? `  dir   ${entry.name}/  (${entry.childCount} item(s))`
       : `  file  ${entry.name}  ${entry.size ?? '?'}B`
   );
 
   const notes: string[] = [];
   if (outcome.truncated || directChildren.size > MAX_ENTRIES) {
-    notes.push(`항목이 많아 ${MAX_ENTRIES}개까지만 표시했습니다.`);
+    notes.push(`Too many entries - only the first ${MAX_ENTRIES} are shown.`);
   }
   if (hiddenByRules > 0) {
-    notes.push(`${hiddenByRules}개 항목이 제외 규칙(node_modules·거부 목록)으로 숨겨졌습니다.`);
+    notes.push(`${hiddenByRules} item(s) hidden by exclusion rules (node_modules / deny list).`);
   }
 
-  const header = `${base || '.'} (depth=${depth}, ${withSizes.length}개 항목)`;
+  const header = `${base || '.'} (depth=${depth}, ${withSizes.length} item(s))`;
   return textResult([header, ...lines, ...notes.map((note) => `\n${note}`)].join('\n'));
 }

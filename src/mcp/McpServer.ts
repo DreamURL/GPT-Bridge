@@ -3,6 +3,7 @@ import type { ApprovalGate } from '../approval/ApprovalGate';
 import type { AuditLog } from '../audit/AuditLog';
 import type { PendingPreview } from '../approval/vscodeGate';
 import { readConfig, type BridgeConfig } from '../config';
+import { t } from '../i18n';
 import type { SecretStore } from '../secrets';
 import type { BridgeStateStore } from '../state';
 import { ensureCloudflared } from '../tunnel/binary';
@@ -52,13 +53,13 @@ export class BridgeServer implements vscode.Disposable {
 
   async start(): Promise<void> {
     if (this.isRunning || this.starting) {
-      this.deps.log.info('서버가 이미 실행 중입니다');
+      this.deps.log.info('The server is already running');
       return;
     }
 
     const folder = vscode.workspace.workspaceFolders?.[0];
     if (folder === undefined) {
-      const message = '열린 워크스페이스 폴더가 없습니다. 폴더를 먼저 여세요.';
+      const message = 'No workspace folder is open. Open a folder first.';
       this.deps.store.update({ status: 'error', message });
       void vscode.window.showErrorMessage(`GPT Bridge: ${message}`);
       return;
@@ -78,10 +79,10 @@ export class BridgeServer implements vscode.Disposable {
       const rgPath = resolveRgPath(this.deps.extensionPath);
       if (rgPath === undefined) {
         this.deps.log.warn(
-          'ripgrep 바이너리를 찾지 못했습니다. list_directory / search_text가 비활성화됩니다.'
+          'The ripgrep binary was not found. list_directory / search_text will be disabled.'
         );
         void vscode.window.showWarningMessage(
-          'GPT Bridge: ripgrep을 찾지 못해 파일 목록·검색 툴이 비활성화됩니다.'
+          t('server.rgMissing')
         );
       } else {
         this.deps.log.info(`ripgrep: ${rgPath}`);
@@ -100,7 +101,7 @@ export class BridgeServer implements vscode.Disposable {
         reads: this.reads,
         onBlocked: (tool, reason, requestedPath) => {
           // 차단된 접근 시도는 조용히 실패시키지 않는다 (project.md §5.5).
-          this.deps.log.warn(`차단됨 — ${tool}(${requestedPath}): ${reason}`);
+          this.deps.log.warn(`Blocked - ${tool}(${requestedPath}): ${reason}`);
           this.deps.audit.append({
             kind: 'path_denied',
             tool,
@@ -109,7 +110,7 @@ export class BridgeServer implements vscode.Disposable {
             message: reason
           });
           void vscode.window.showWarningMessage(
-            `GPT Bridge: 차단된 접근 시도 — ${tool} "${requestedPath}" (${reason})`
+            t('server.blocked', `${tool} "${requestedPath}" (${reason})`)
           );
         },
         onActivity: (entry) => {
@@ -173,10 +174,10 @@ export class BridgeServer implements vscode.Disposable {
           error: (message) => this.deps.log.error(message)
         },
         onAuthFailure: (reason, remoteAddress) => {
-          this.deps.log.warn(`인증 실패 (${reason}) — ${remoteAddress ?? '주소 불명'}`);
+          this.deps.log.warn(`Auth failure (${reason}) - ${remoteAddress ?? 'unknown address'}`);
           this.deps.audit.append({
             kind: 'auth_failure',
-            detail: remoteAddress ?? '주소 불명',
+            detail: remoteAddress ?? 'unknown address',
             ok: false,
             message: reason
           });
@@ -187,25 +188,25 @@ export class BridgeServer implements vscode.Disposable {
       this.http = http;
       this.deps.store.update({ status: 'running', port, message: undefined });
       this.deps.audit.append({ kind: 'server', detail: `started port=${port}`, ok: true });
-      this.deps.log.info(`로컬 엔드포인트: http://127.0.0.1:${port}${MCP_ENDPOINT}`);
+      this.deps.log.info(`Local endpoint: http://127.0.0.1:${port}${MCP_ENDPOINT}`);
 
       if (config.tunnelProvider === 'cloudflare') {
         // 터널 실패는 서버 실패가 아니다. 로컬 엔드포인트는 계속 살아 있다.
         void this.startTunnel(port);
       } else {
-        this.deps.log.info('터널 제공자가 none이라 로컬에서만 접근할 수 있습니다.');
+        this.deps.log.info('Tunnel provider is none - the server is reachable locally only.');
       }
     } catch (error) {
       await this.stop();
 
       if (error instanceof PortInUseError) {
-        const message = `포트 ${error.port}이(가) 사용 중입니다. gptBridge.port 설정을 바꾸세요.`;
+        const message = t('server.portInUse', error.port);
         this.deps.store.update({ status: 'error', message });
         const choice = await vscode.window.showErrorMessage(
           `GPT Bridge: ${message}`,
-          '설정 열기'
+          t('server.openSettings')
         );
-        if (choice === '설정 열기') {
+        if (choice === t('server.openSettings')) {
           void vscode.commands.executeCommand('workbench.action.openSettings', 'gptBridge.port');
         }
         return;
@@ -213,8 +214,8 @@ export class BridgeServer implements vscode.Disposable {
 
       const reason = error instanceof Error ? error.message : String(error);
       this.deps.store.update({ status: 'error', message: reason });
-      this.deps.log.error(`서버 시작 실패: ${reason}`);
-      void vscode.window.showErrorMessage(`GPT Bridge: 서버 시작 실패 — ${reason}`);
+      this.deps.log.error(`Failed to start the server: ${reason}`);
+      void vscode.window.showErrorMessage(t('server.startFailed', reason));
     } finally {
       this.starting = false;
     }
@@ -251,7 +252,7 @@ export class BridgeServer implements vscode.Disposable {
           if (status === 'connected') {
             this.deps.store.update({ status: 'tunneled', tunnelUrl: url, message });
             if (url !== undefined) {
-              this.deps.log.info(`터널 연결됨: ${url}${MCP_ENDPOINT}`);
+              this.deps.log.info(`Tunnel connected: ${url}${MCP_ENDPOINT}`);
             }
             return;
           }
@@ -259,7 +260,7 @@ export class BridgeServer implements vscode.Disposable {
             // 서버 자체는 살아 있으므로 running으로 되돌린다.
             this.deps.store.update({ status: 'running', tunnelUrl: undefined, message });
             void vscode.window.showWarningMessage(
-              `GPT Bridge: 터널 연결에 실패했습니다 — ${message ?? '사유 불명'}. 로컬 엔드포인트는 계속 사용할 수 있습니다.`
+              t('server.tunnelFailed', message ?? 'unknown reason')
             );
             return;
           }
@@ -275,15 +276,15 @@ export class BridgeServer implements vscode.Disposable {
       if (url !== undefined && token === undefined) {
         // Quick Tunnel은 재시작마다 URL이 바뀐다. 사용자가 알아야 한다.
         this.deps.log.warn(
-          'Quick Tunnel은 재시작할 때마다 URL이 바뀝니다. 실사용에는 Named Tunnel을 권장합니다.'
+          'A Quick Tunnel URL changes on every restart. Prefer a Named Tunnel for regular use.'
         );
       }
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      this.deps.log.error(`터널 시작 실패: ${reason}`);
-      this.deps.store.update({ message: `터널 실패: ${reason}` });
+      this.deps.log.error(`Failed to start the tunnel: ${reason}`);
+      this.deps.store.update({ message: `Tunnel failed: ${reason}` });
       void vscode.window.showWarningMessage(
-        `GPT Bridge: 터널을 시작하지 못했습니다 — ${reason}. 로컬 엔드포인트는 계속 사용할 수 있습니다.`
+        t('server.tunnelFailed', reason)
       );
     }
   }
@@ -320,7 +321,7 @@ export class BridgeServer implements vscode.Disposable {
   async refreshToken(): Promise<void> {
     if (this.isRunning) {
       this.token = await this.deps.secrets.getAuthToken();
-      this.deps.log.warn('인증 토큰이 갱신되었습니다. 기존 토큰은 즉시 무효입니다.');
+      this.deps.log.warn('Auth token refreshed. The previous token is invalid immediately.');
     }
   }
 

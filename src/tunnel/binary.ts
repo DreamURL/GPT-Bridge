@@ -140,7 +140,7 @@ async function fetchWithHostCheck(startUrl: string, log: DownloadLogger): Promis
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
     if (!isAllowedHost(url)) {
-      throw new BinaryError(`허용되지 않은 다운로드 호스트입니다: ${new URL(url).hostname}`);
+      throw new BinaryError(`Download host is not allowed: ${new URL(url).hostname}`);
     }
 
     const controller = new AbortController();
@@ -151,7 +151,7 @@ async function fetchWithHostCheck(startUrl: string, log: DownloadLogger): Promis
       response = await fetch(url, { redirect: 'manual', signal: controller.signal });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      throw new BinaryError(`다운로드 실패: ${reason}`);
+      throw new BinaryError(`Download failed: ${reason}`);
     } finally {
       clearTimeout(timer);
     }
@@ -159,21 +159,21 @@ async function fetchWithHostCheck(startUrl: string, log: DownloadLogger): Promis
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location');
       if (location === null) {
-        throw new BinaryError('리다이렉트 응답에 Location 헤더가 없습니다');
+        throw new BinaryError('The redirect response has no Location header');
       }
       url = new URL(location, url).toString();
-      log.info(`리다이렉트 → ${new URL(url).hostname}`);
+      log.info(`Redirect -> ${new URL(url).hostname}`);
       continue;
     }
 
     if (!response.ok) {
-      throw new BinaryError(`다운로드 실패: HTTP ${response.status}`);
+      throw new BinaryError(`Download failed: HTTP ${response.status}`);
     }
 
     return Buffer.from(await response.arrayBuffer());
   }
 
-  throw new BinaryError('리다이렉트가 너무 많습니다');
+  throw new BinaryError('Too many redirects');
 }
 
 export interface EnsureOptions {
@@ -191,8 +191,8 @@ export async function ensureCloudflared(options: EnsureOptions): Promise<string>
   const spec = assetForPlatform(key);
   if (spec === undefined) {
     throw new BinaryError(
-      `이 플랫폼(${key})용 cloudflared 바이너리가 준비되어 있지 않습니다. ` +
-        `직접 설치한 cloudflared를 쓰거나 터널을 끄세요.`
+      `No pinned cloudflared binary is available for this platform (${key}). ` +
+        `Install cloudflared yourself, or turn the tunnel off.`
     );
   }
 
@@ -203,28 +203,28 @@ export async function ensureCloudflared(options: EnsureOptions): Promise<string>
   try {
     const existing = await fs.readFile(target);
     if (hashMatches(sha256(existing), spec.binarySha256)) {
-      options.log.info(`cloudflared ${CLOUDFLARED_VERSION} 재사용: ${target}`);
+      options.log.info(`Reusing cloudflared ${CLOUDFLARED_VERSION}: ${target}`);
       return target;
     }
-    options.log.warn('기존 cloudflared 파일의 해시가 맞지 않아 다시 받습니다.');
+    options.log.warn('The existing cloudflared file has a bad hash - downloading again.');
     await fs.rm(target, { force: true });
   } catch {
     // 없으면 아래에서 받는다.
   }
 
   const url = downloadUrl(spec.asset);
-  options.log.info(`cloudflared ${CLOUDFLARED_VERSION} 다운로드: ${url}`);
+  options.log.info(`Downloading cloudflared ${CLOUDFLARED_VERSION}: ${url}`);
   const payload = await fetchWithHostCheck(url, options.log);
 
   const actual = sha256(payload);
   if (!hashMatches(actual, spec.assetSha256)) {
     // 재시도로 우회하지 않는다. 즉시 중단한다.
     throw new BinaryError(
-      `cloudflared 해시가 일치하지 않습니다. 다운로드를 중단합니다.\n` +
-        `기대: ${spec.assetSha256}\n실제: ${actual}`
+      `cloudflared hash mismatch - aborting the download.\n` +
+        `expected: ${spec.assetSha256}\nactual: ${actual}`
     );
   }
-  options.log.info('SHA256 검증 통과');
+  options.log.info('SHA256 verification passed');
 
   const binary =
     spec.archiveMember === undefined
@@ -235,8 +235,8 @@ export async function ensureCloudflared(options: EnsureOptions): Promise<string>
   const binaryHash = sha256(binary);
   if (!hashMatches(binaryHash, spec.binarySha256)) {
     throw new BinaryError(
-      `추출된 cloudflared 실행 파일의 해시가 일치하지 않습니다.\n` +
-        `기대: ${spec.binarySha256}\n실제: ${binaryHash}`
+      `The extracted cloudflared binary has a hash mismatch.\n` +
+        `expected: ${spec.binarySha256}\nactual: ${binaryHash}`
     );
   }
 
@@ -247,6 +247,6 @@ export async function ensureCloudflared(options: EnsureOptions): Promise<string>
   await fs.rename(temp, target);
   await fs.chmod(target, 0o755);
 
-  options.log.info(`cloudflared 준비 완료: ${target}`);
+  options.log.info(`cloudflared ready: ${target}`);
   return target;
 }

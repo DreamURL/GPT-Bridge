@@ -31,7 +31,7 @@ export interface HttpServerOptions {
 
 export class PortInUseError extends Error {
   constructor(readonly port: number) {
-    super(`포트 ${port}이(가) 이미 사용 중입니다`);
+    super(`Port ${port} is already in use`);
     this.name = 'PortInUseError';
   }
 }
@@ -62,7 +62,7 @@ export class McpHttpServer {
 
   async start(): Promise<number> {
     if (this.server !== undefined) {
-      throw new Error('서버가 이미 실행 중입니다');
+      throw new Error('The server is already running');
     }
 
     const app = express();
@@ -98,14 +98,14 @@ export class McpHttpServer {
     app.get(MCP_ENDPOINT, auth, (_req, res) => {
       res.status(405).set('Allow', 'POST').json({
         jsonrpc: '2.0',
-        error: { code: -32000, message: 'Method Not Allowed: 이 서버는 무상태 모드입니다' },
+        error: { code: -32000, message: 'Method Not Allowed: this server runs in stateless mode' },
         id: null
       });
     });
     app.delete(MCP_ENDPOINT, auth, (_req, res) => {
       res.status(405).set('Allow', 'POST').json({
         jsonrpc: '2.0',
-        error: { code: -32000, message: 'Method Not Allowed: 이 서버는 무상태 모드입니다' },
+        error: { code: -32000, message: 'Method Not Allowed: this server runs in stateless mode' },
         id: null
       });
     });
@@ -127,7 +127,7 @@ export class McpHttpServer {
         const address = server.address() as AddressInfo | null;
         this.server = server;
         this.boundPort = address?.port ?? this.options.port;
-        this.options.log.info(`MCP 서버가 http://${BIND_ADDRESS}:${this.boundPort}${MCP_ENDPOINT} 에서 대기 중입니다`);
+        this.options.log.info(`MCP server listening at http://${BIND_ADDRESS}:${this.boundPort}${MCP_ENDPOINT}`);
         resolve(this.boundPort);
       };
 
@@ -157,7 +157,7 @@ export class McpHttpServer {
       await transport.handleRequest(req, res, body);
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      this.options.log.error(`MCP 요청 처리 실패: ${reason}`);
+      this.options.log.error(`Failed to handle MCP request: ${reason}`);
       if (!res.headersSent) {
         res.status(500).json({
           jsonrpc: '2.0',
@@ -181,6 +181,6 @@ export class McpHttpServer {
       // keep-alive 연결이 남아 있으면 close가 늦어진다. 즉시 끊는다.
       server.closeAllConnections();
     });
-    this.options.log.info('MCP 서버를 중지했습니다');
+    this.options.log.info('MCP server stopped');
   }
 }

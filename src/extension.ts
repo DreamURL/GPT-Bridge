@@ -38,7 +38,7 @@ export function activate(context: vscode.ExtensionContext): void {
     store,
     statusBar,
     store.onDidChange((state) => {
-      log.debug(`상태 변경: ${state.status}`);
+      log.debug(`State changed: ${state.status}`);
       statusBar.update(state);
       view.render(state);
     }),
@@ -52,7 +52,7 @@ export function activate(context: vscode.ExtensionContext): void {
     directory: vscode.Uri.joinPath(context.globalStorageUri, 'audit').fsPath,
     onError: (message) => log.error(message)
   });
-  log.info(`감사 로그: ${audit.path}`);
+  log.info(`Audit log: ${audit.path}`);
 
   // 승인 게이트. session 모드 승인은 확장 리로드 시 자연히 해제된다 —
   // 이 객체가 새로 만들어지기 때문이다 (project.md §5.4).
@@ -64,7 +64,7 @@ export function activate(context: vscode.ExtensionContext): void {
       tool: request.tool,
       detail: request.relPath,
       ok: false,
-      message: `만료 후 선택: ${choice}`
+      message: `choice after expiry: ${choice}`
     })
   );
   context.subscriptions.push(diffPreview);
@@ -79,7 +79,7 @@ export function activate(context: vscode.ExtensionContext): void {
     extensionPath: context.extensionUri.fsPath,
     storageDir: context.globalStorageUri.fsPath,
     onActivity: (entry) => {
-      const mark = entry.blocked === true ? '차단' : entry.ok ? 'ok' : '실패';
+      const mark = entry.blocked === true ? 'blocked' : entry.ok ? 'ok' : 'failed';
       log.info(`[${mark}] ${entry.tool} ${entry.detail} (${entry.durationMs}ms)`);
       view.pushActivity(entry);
     }

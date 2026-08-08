@@ -109,6 +109,13 @@ const en = {
   'server.tunnelFailed':
     'GPT Bridge: Could not start the tunnel — {0}. The local endpoint is still usable.',
   'server.blocked': 'GPT Bridge: Blocked access — {0}',
+  'activity.blocked': 'BLOCK',
+  'activity.detailHint': 'Click to see details in the log',
+  'state.stopped': 'Stopped',
+  'state.starting': 'Starting...',
+  'state.running': 'Running locally (port {0})',
+  'state.tunneled': 'Running - tunnel connected',
+  'state.error': 'Error',
   'server.rgMissing':
     'GPT Bridge: ripgrep was not found, so file listing and search are disabled. Rebuild the .vsix on this machine.'
 } as const;
@@ -199,6 +206,13 @@ const ko: Record<Key, string> = {
   'server.tunnelFailed':
     'GPT Bridge: 터널을 시작하지 못했습니다 — {0}. 로컬 엔드포인트는 계속 사용할 수 있습니다.',
   'server.blocked': 'GPT Bridge: 접근이 차단되었습니다 — {0}',
+  'activity.blocked': '차단',
+  'activity.detailHint': '상세는 로그에서 확인',
+  'state.stopped': '중지됨',
+  'state.starting': '시작 중…',
+  'state.running': '로컬 실행 중 (포트 {0})',
+  'state.tunneled': '실행 중 · 터널 연결됨',
+  'state.error': '오류',
   'server.rgMissing':
     'GPT Bridge: ripgrep을 찾지 못해 파일 목록·검색이 비활성화됩니다. 이 기기에서 .vsix를 다시 빌드하세요.'
 };
@@ -287,6 +301,13 @@ const ja: Record<Key, string> = {
   'server.tunnelFailed':
     'GPT Bridge: トンネルを開始できませんでした — {0}。ローカルエンドポイントは引き続き使えます。',
   'server.blocked': 'GPT Bridge: アクセスを遮断しました — {0}',
+  'activity.blocked': '遮断',
+  'activity.detailHint': '詳細はログで確認',
+  'state.stopped': '停止中',
+  'state.starting': '起動中…',
+  'state.running': 'ローカルで実行中（ポート {0}）',
+  'state.tunneled': '実行中・トンネル接続済み',
+  'state.error': 'エラー',
   'server.rgMissing':
     'GPT Bridge: ripgrep が見つからないため、ファイル一覧と検索は無効です。この端末で .vsix を再ビルドしてください。'
 };
@@ -371,6 +392,13 @@ const zh: Record<Key, string> = {
   'server.startFailed': 'GPT Bridge：服务器启动失败 — {0}',
   'server.tunnelFailed': 'GPT Bridge：隧道启动失败 — {0}。本地端点仍然可用。',
   'server.blocked': 'GPT Bridge：已阻止访问 — {0}',
+  'activity.blocked': '已阻止',
+  'activity.detailHint': '点击可在日志中查看详情',
+  'state.stopped': '已停止',
+  'state.starting': '启动中…',
+  'state.running': '本地运行中（端口 {0}）',
+  'state.tunneled': '运行中 · 隧道已连接',
+  'state.error': '错误',
   'server.rgMissing':
     'GPT Bridge：找不到 ripgrep，文件列表与搜索已禁用。请在本机重新构建 .vsix。'
 };
@@ -459,6 +487,13 @@ const es: Record<Key, string> = {
   'server.tunnelFailed':
     'GPT Bridge: No se pudo iniciar el túnel — {0}. El punto final local sigue disponible.',
   'server.blocked': 'GPT Bridge: Acceso bloqueado — {0}',
+  'activity.blocked': 'BLOQ',
+  'activity.detailHint': 'Haz clic para ver los detalles en el registro',
+  'state.stopped': 'Detenido',
+  'state.starting': 'Iniciando...',
+  'state.running': 'Ejecutándose en local (puerto {0})',
+  'state.tunneled': 'En ejecución · túnel conectado',
+  'state.error': 'Error',
   'server.rgMissing':
     'GPT Bridge: No se encontró ripgrep, así que el listado y la búsqueda de archivos están desactivados. Vuelve a compilar el .vsix en esta máquina.'
 };

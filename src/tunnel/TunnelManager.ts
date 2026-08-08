@@ -113,12 +113,12 @@ export class TunnelManager {
         return;
       }
 
-      this.options.log.warn(`cloudflared가 종료되었습니다 (code=${code}, signal=${signal})`);
+      this.options.log.warn(`cloudflared exited (code=${code}, signal=${signal})`);
       void this.restart();
     });
 
     child.on('error', (error) => {
-      this.options.log.error(`cloudflared 실행 실패: ${error.message}`);
+      this.options.log.error(`Failed to run cloudflared: ${error.message}`);
       this.child = undefined;
       this.options.onStatus('failed', undefined, error.message);
     });
@@ -127,8 +127,8 @@ export class TunnelManager {
     this.url = url;
 
     if (url === undefined && !named) {
-      this.options.log.warn('터널 URL을 찾지 못했습니다.');
-      this.options.onStatus('failed', undefined, '터널 URL을 확인하지 못했습니다');
+      this.options.log.warn('Could not find the tunnel URL.');
+      this.options.onStatus('failed', undefined, 'Could not determine the tunnel URL');
       return undefined;
     }
 
@@ -136,7 +136,7 @@ export class TunnelManager {
       'connected',
       url,
       url === undefined
-        ? 'Named Tunnel이 실행 중입니다. 공개 호스트명은 gptBridge.tunnel.hostname 설정에 지정하세요.'
+        ? 'A Named Tunnel is running. Set the public hostname in gptBridge.tunnel.hostname.'
         : undefined
     );
     this.startHealthChecks();
@@ -210,7 +210,7 @@ export class TunnelManager {
       this.restartCount = 0;
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      this.options.log.warn(`터널 헬스체크 실패: ${reason}`);
+      this.options.log.warn(`Tunnel health check failed: ${reason}`);
       await this.restart();
     } finally {
       clearTimeout(timer);
@@ -223,16 +223,16 @@ export class TunnelManager {
     }
     if (this.restartCount >= MAX_RESTART_ATTEMPTS) {
       this.options.log.error(
-        `터널 재시작을 ${MAX_RESTART_ATTEMPTS}회 시도했으나 실패했습니다. 자동 재시작을 중단합니다.`
+        `Tried restarting the tunnel ${MAX_RESTART_ATTEMPTS} times without success. Giving up on auto-restart.`
       );
-      this.options.onStatus('failed', undefined, '터널 재시작에 반복 실패했습니다');
+      this.options.onStatus('failed', undefined, 'The tunnel failed to restart repeatedly');
       return;
     }
 
     const delay = backoffDelayMs(this.restartCount);
     this.restartCount += 1;
     this.options.log.warn(
-      `${delay / 1000}초 후 터널을 재시작합니다 (${this.restartCount}/${MAX_RESTART_ATTEMPTS})`
+      `Restarting the tunnel in ${delay / 1000}s (${this.restartCount}/${MAX_RESTART_ATTEMPTS})`
     );
 
     await this.killChild();
@@ -272,7 +272,7 @@ export class TunnelManager {
 
       const killTimer = setTimeout(() => {
         if (child.exitCode === null) {
-          this.options.log.warn('cloudflared가 SIGTERM에 응답하지 않아 SIGKILL을 보냅니다.');
+          this.options.log.warn('cloudflared did not respond to SIGTERM - sending SIGKILL.');
           child.kill('SIGKILL');
         }
         resolve();
@@ -310,13 +310,13 @@ export class TunnelManager {
       });
 
       killer.on('error', (error) => {
-        this.options.log.warn(`taskkill 실행 실패: ${error.message}. 직접 종료를 시도합니다.`);
+        this.options.log.warn(`taskkill failed: ${error.message}. Falling back to a direct kill.`);
         child.kill();
         settle();
       });
 
       killer.on('exit', () => {
-        this.options.log.info(`cloudflared 프로세스 트리를 종료했습니다 (pid ${pid})`);
+        this.options.log.info(`Terminated the cloudflared process tree (pid ${pid})`);
         settle();
       });
     });

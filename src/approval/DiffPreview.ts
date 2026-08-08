@@ -42,7 +42,7 @@ export class DiffPreview implements vscode.Disposable {
         'vscode.diff',
         original,
         previewUri,
-        `${relPath} — GPT 제안 (적용 전)`,
+        `${relPath} - GPT proposal (before applying)`,
         { preview: true }
       );
     } finally {

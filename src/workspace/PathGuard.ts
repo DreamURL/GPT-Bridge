@@ -55,7 +55,7 @@ const WINDOWS_DEVICE_NAMES = new Set([
  */
 function assertNoWindowsTricks(userPath: string): void {
   if (userPath.includes(':')) {
-    throw new PathError('경로에 콜론을 사용할 수 없습니다');
+    throw new PathError('Colons are not allowed in a path');
   }
 
   for (const segment of userPath.split('/')) {
@@ -64,12 +64,12 @@ function assertNoWindowsTricks(userPath: string): void {
     }
 
     if (segment.endsWith('.') || segment.endsWith(' ')) {
-      throw new PathError('경로 구성요소는 마침표나 공백으로 끝날 수 없습니다');
+      throw new PathError('A path segment cannot end with a dot or a space');
     }
 
     const stem = segment.split('.')[0]?.toLowerCase() ?? '';
     if (WINDOWS_DEVICE_NAMES.has(stem)) {
-      throw new PathError(`예약된 장치명은 사용할 수 없습니다: ${segment}`);
+      throw new PathError(`Reserved device names are not allowed: ${segment}`);
     }
   }
 }
@@ -101,12 +101,12 @@ async function realpathOrParent(target: string): Promise<string> {
       return trailing.length === 0 ? real : path.join(real, ...trailing.reverse());
     } catch (error) {
       if (!isNotFound(error)) {
-        throw new PathError('경로를 확인할 수 없습니다');
+        throw new PathError('Cannot resolve the path');
       }
       const parent = path.dirname(current);
       if (parent === current) {
         // 파일시스템 루트까지 올라갔다. 정상 경로에서는 도달할 수 없다.
-        throw new PathError('경로를 확인할 수 없습니다');
+        throw new PathError('Cannot resolve the path');
       }
       trailing.push(path.basename(current));
       current = parent;
@@ -140,7 +140,7 @@ export class PathGuard {
       try {
         this.realRootCache = await fs.realpath(this.rootRaw);
       } catch {
-        throw new PathError('워크스페이스 루트를 확인할 수 없습니다');
+        throw new PathError('Cannot resolve the workspace root');
       }
     }
     return this.realRootCache;
@@ -165,7 +165,7 @@ export class PathGuard {
 
     const pattern = this.denyList.matchedPattern(relative);
     if (pattern !== undefined) {
-      throw new PathError(`접근이 차단된 경로입니다 (거부 규칙: ${pattern})`);
+      throw new PathError(`This path is blocked (deny rule: ${pattern})`);
     }
 
     return { absolute: real, relative };
@@ -177,11 +177,11 @@ export class PathGuard {
    */
   private validateSyntax(userPath: string): string {
     if (typeof userPath !== 'string') {
-      throw new PathError('경로는 문자열이어야 합니다');
+      throw new PathError('The path must be a string');
     }
 
     if (userPath.includes('\0')) {
-      throw new PathError('잘못된 경로입니다');
+      throw new PathError('Invalid path');
     }
 
     // URL 인코딩으로 검증을 우회하는 시도를 막는다.
@@ -191,26 +191,26 @@ export class PathGuard {
     try {
       decoded = decodeURIComponent(userPath);
     } catch {
-      throw new PathError('잘못된 경로입니다 (인코딩 오류)');
+      throw new PathError('Invalid path (encoding error)');
     }
     if (decoded !== userPath) {
-      throw new PathError('URL 인코딩된 경로는 허용되지 않습니다. 디코딩된 경로를 사용하세요');
+      throw new PathError('URL-encoded paths are not allowed. Send the decoded path');
     }
 
     // 역슬래시는 경로 구분자로 받지 않는다. POSIX에서는 파일명의 일부라
     // '..\..\etc\passwd'가 루트 안쪽 파일명으로 통과해 버린다.
     if (userPath.includes('\\')) {
-      throw new PathError('역슬래시는 허용되지 않습니다. 구분자로 /를 사용하세요');
+      throw new PathError('Backslashes are not allowed. Use / as the separator');
     }
 
     if (WINDOWS_DRIVE.test(userPath)) {
       // path.isAbsolute('C:a.txt')는 win32에서도 false다. 드라이브 상대 경로는
       // 여기서 잡아야 한다.
-      throw new PathError('상대 경로만 허용됩니다');
+      throw new PathError('Only relative paths are allowed');
     }
 
     if (path.isAbsolute(userPath) || userPath.startsWith('/')) {
-      throw new PathError('상대 경로만 허용됩니다');
+      throw new PathError('Only relative paths are allowed');
     }
 
     const trimmed = userPath.trim();
@@ -234,7 +234,7 @@ export class PathGuard {
       rel === '..' || rel.startsWith(`..${path.sep}`) || rel.startsWith('../');
 
     if (escapes || path.isAbsolute(rel)) {
-      throw new PathError('워크스페이스 외부 접근이 차단되었습니다');
+      throw new PathError('Access outside the workspace is blocked');
     }
     return toPosixPath(rel);
   }

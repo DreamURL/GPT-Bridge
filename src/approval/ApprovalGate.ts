@@ -75,7 +75,7 @@ export class ApprovalGate {
     if (!request.alwaysConfirm) {
       const auto = this.autoDecision(request);
       if (auto !== undefined) {
-        this.options.log.info(`자동 승인 (${auto}): ${request.tool} ${request.relPath}`);
+        this.options.log.info(`Auto-approved (${auto}): ${request.tool} ${request.relPath}`);
         return 'approved';
       }
     }
@@ -87,7 +87,7 @@ export class ApprovalGate {
       timer = setTimeout(() => {
         state.expired = true;
         this.options.log.warn(
-          `승인 대기 시간이 지나 거부 처리했습니다: ${request.tool} ${request.relPath} (id=${request.id})`
+          `Approval window expired, treated as denied: ${request.tool} ${request.relPath} (id=${request.id})`
         );
         resolve('expired');
       }, this.options.timeoutMs());

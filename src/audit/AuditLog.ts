@@ -75,7 +75,7 @@ export class AuditLog {
       .then(() => this.write(record))
       .catch((error: unknown) => {
         const reason = error instanceof Error ? error.message : String(error);
-        this.options.onError?.(`감사 로그 기록 실패: ${reason}`);
+        this.options.onError?.(`Failed to write the audit log: ${reason}`);
       });
   }
 
@@ -113,5 +113,5 @@ export class AuditLog {
 function truncate(value: string): string {
   return value.length <= MAX_DETAIL_LENGTH
     ? value
-    : `${value.slice(0, MAX_DETAIL_LENGTH)}…(${value.length}자)`;
+    : `${value.slice(0, MAX_DETAIL_LENGTH)}...(${value.length} chars)`;
 }

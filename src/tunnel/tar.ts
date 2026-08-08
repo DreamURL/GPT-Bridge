@@ -64,7 +64,7 @@ export function readTar(buffer: Buffer): TarEntry[] {
 
     const dataEnd = offset + size;
     if (dataEnd > buffer.length) {
-      throw new TarError('tar 아카이브가 잘려 있습니다');
+      throw new TarError('The tar archive is truncated');
     }
 
     // '0' 또는 NUL이 일반 파일. 나머지(디렉터리, 링크, PAX 헤더)는 건너뛴다.
@@ -89,7 +89,7 @@ export function extractFileFromTgz(archive: Buffer, fileName: string): Buffer {
     tarBuffer = zlib.gunzipSync(archive);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    throw new TarError(`아카이브 압축 해제 실패: ${reason}`);
+    throw new TarError(`Failed to decompress the archive: ${reason}`);
   }
 
   const entries = readTar(tarBuffer);
@@ -104,7 +104,7 @@ export function extractFileFromTgz(archive: Buffer, fileName: string): Buffer {
   }
 
   throw new TarError(
-    `아카이브에서 ${fileName}을(를) 찾지 못했습니다 (포함된 항목: ${entries
+    `Could not find ${fileName} in the archive (entries: ${entries
       .map((entry) => entry.name)
       .join(', ')})`
   );

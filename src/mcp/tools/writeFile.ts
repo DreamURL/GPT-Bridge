@@ -6,24 +6,24 @@ import { CRLF, LF, normalizeToEol, summarizeChange } from '../../workspace/textE
 import { errorResult, textResult, type ToolContext, type ToolResult } from './types';
 import { maybeAutoSave } from './editFile';
 
-export const WRITE_FILE_DESCRIPTION = `파일을 새로 만들거나 내용을 통째로 교체한다.
+export const WRITE_FILE_DESCRIPTION = `Create a new file or replace its entire contents.
 
-**신규 생성 전용으로 쓴다.** 기존 파일을 고칠 때는 edit_file을 사용한다.
-이 툴은 파일 전체를 덮어쓰므로 관계없는 부분까지 사라진다.
+**Use this for creating new files.** To modify an existing file, use edit_file.
+This tool overwrites the whole file, so unrelated parts are lost.
 
-언제 쓰나: 존재하지 않는 파일을 만들 때.
-언제 쓰지 않나: 이미 있는 파일의 일부를 고칠 때 — edit_file을 쓴다.
+When to use: creating a file that does not exist yet.
+When not to use: changing part of an existing file - use edit_file.
 
-주의: **신규 파일 생성은 승인 즉시 디스크에 반영된다.** 기존 파일을 교체하는
-경우에만 에디터 버퍼에 적용되어 Ctrl+Z로 되돌릴 수 있다.
+Note: **creating a new file is written to disk as soon as it is approved.**
+Only replacing an existing file goes to the editor buffer, where Ctrl+Z can undo it.
 
-파라미터
-  path     루트 기준 상대 경로. 예: "src/new-module.ts"
-  content  파일 전체 내용`;
+Parameters
+  path     Path relative to the workspace root. Example: "src/new-module.ts"
+  content  The full contents of the file`;
 
 export const writeFileSchema = {
-  path: z.string().describe('루트 기준 상대 경로. 예: "src/new-module.ts"'),
-  content: z.string().describe('파일 전체 내용')
+  path: z.string().describe('Path relative to the workspace root. Example: "src/new-module.ts"'),
+  content: z.string().describe('The full contents of the file')
 };
 
 export interface WriteFileArgs {
@@ -39,7 +39,7 @@ export async function writeFileTool(ctx: ToolContext, args: WriteFileArgs): Prom
   try {
     const stat = await vscode.workspace.fs.stat(uri);
     if (stat.type === vscode.FileType.Directory) {
-      return errorResult(`${resolved.relative}은(는) 디렉터리입니다.`);
+      return errorResult(`${resolved.relative} is a directory.`);
     }
   } catch {
     exists = false;
@@ -64,7 +64,7 @@ async function replaceExisting(
   const proposed = normalizeToEol(content, eol);
 
   if (proposed === text) {
-    return textResult(`${relPath}의 내용이 이미 동일합니다. 변경하지 않았습니다.`);
+    return textResult(`${relPath} already has this exact content. Nothing changed.`);
   }
 
   const summary = summarizeChange(text, proposed);
@@ -74,7 +74,7 @@ async function replaceExisting(
       id: newRequestId(),
       tool: 'write_file',
       relPath,
-      summary: `전체 교체 +${summary.added} -${summary.removed}`,
+      summary: `full replace +${summary.added} -${summary.removed}`,
       diskImmediate: false,
       alwaysConfirm: false
     },
@@ -84,8 +84,8 @@ async function replaceExisting(
   if (decision !== 'approved') {
     return errorResult(
       decision === 'expired'
-        ? '승인 대기 시간이 지나 적용하지 않았습니다.'
-        : '사용자가 전체 교체를 거부했습니다.'
+        ? 'The approval window expired, so nothing was applied.'
+        : 'The user rejected the full replacement.'
     );
   }
 
@@ -98,16 +98,16 @@ async function replaceExisting(
   const edit = new vscode.WorkspaceEdit();
   edit.replace(uri, whole, proposed);
   if (!(await vscode.workspace.applyEdit(edit))) {
-    return errorResult(`교체를 적용하지 못했습니다: ${relPath}`);
+    return errorResult(`Failed to apply the replacement: ${relPath}`);
   }
 
   const saved = await maybeAutoSave(ctx, uri);
   return textResult(
-    `${relPath} 전체를 교체했습니다 (+${summary.added} -${summary.removed}).\n` +
-      '경고: 기존 파일 수정에는 edit_file 사용을 권장합니다. 전체 교체는 관계없는 부분까지 바꿉니다.\n' +
+    `Replaced all of ${relPath} (+${summary.added} -${summary.removed}).\n` +
+      'Warning: prefer edit_file for modifying existing files. A full replace also changes unrelated parts.\n' +
       (saved
-        ? '자동 저장되어 디스크에 반영되었습니다.'
-        : '에디터 버퍼에만 적용되었습니다. 저장 전까지 디스크는 변경되지 않습니다.')
+        ? 'Auto-save is on, so the change was written to disk.'
+        : 'Applied to the editor buffer only. Disk stays unchanged until saved.')
   );
 }
 
@@ -128,7 +128,7 @@ async function createNew(
       id: newRequestId(),
       tool: 'write_file',
       relPath,
-      summary: `새 파일 ${lineCount}줄`,
+      summary: `new file, ${lineCount} lines`,
       diskImmediate: true,
       alwaysConfirm: false
     },
@@ -138,19 +138,19 @@ async function createNew(
   if (decision !== 'approved') {
     return errorResult(
       decision === 'expired'
-        ? '승인 대기 시간이 지나 파일을 만들지 않았습니다.'
-        : '사용자가 파일 생성을 거부했습니다.'
+        ? 'The approval window expired, so the file was not created.'
+        : 'The user rejected creating the file.'
     );
   }
 
   const edit = new vscode.WorkspaceEdit();
   edit.createFile(uri, { overwrite: false, ignoreIfExists: false, contents: Buffer.from(content, 'utf8') });
   if (!(await vscode.workspace.applyEdit(edit))) {
-    return errorResult(`파일을 만들지 못했습니다: ${relPath}`);
+    return errorResult(`Failed to create the file: ${relPath}`);
   }
 
   return textResult(
-    `${relPath}을(를) 만들었습니다 (${lineCount}줄).\n` +
-      '신규 파일 생성은 디스크에 즉시 반영됩니다.'
+    `Created ${relPath} (${lineCount} lines).\n` +
+      'Creating a new file is written to disk immediately.'
   );
 }

@@ -138,7 +138,7 @@ export class BridgeViewProvider implements vscode.WebviewViewProvider {
     const quickTunnel = state.tunnelUrl?.includes('trycloudflare.com') === true;
 
     return `<!DOCTYPE html>
-<html lang="ko">
+<html lang="${config.language}">
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
@@ -352,9 +352,9 @@ function languageOption(value: Lang, current: Lang): string {
 
 function activityRow(entry: ActivityRow): string {
   const blocked = entry.blocked === true;
-  const mark = blocked ? '차단' : entry.ok ? '✓' : '✗';
+  const mark = blocked ? t('activity.blocked') : entry.ok ? '✓' : '✗';
   return (
-    `<li class="${blocked ? 'blocked' : ''}" title="상세는 로그에서 확인">` +
+    `<li class="${blocked ? 'blocked' : ''}" title="${t('activity.detailHint')}">` +
     `<span class="time">${escapeHtml(entry.time)}</span>` +
     `<span class="tool">${escapeHtml(entry.tool)}</span>` +
     `<span class="detail">${escapeHtml(entry.detail)}</span>` +
@@ -366,15 +366,15 @@ function activityRow(entry: ActivityRow): string {
 function describe(state: BridgeState): string {
   switch (state.status) {
     case 'stopped':
-      return '중지됨';
+      return t('state.stopped');
     case 'starting':
-      return '시작 중…';
+      return t('state.starting');
     case 'running':
-      return `로컬 실행 중 (포트 ${state.port ?? '?'})`;
+      return t('state.running', state.port ?? '?');
     case 'tunneled':
-      return '실행 중 · 터널 연결됨';
+      return t('state.tunneled');
     case 'error':
-      return '오류';
+      return t('state.error');
   }
 }
 

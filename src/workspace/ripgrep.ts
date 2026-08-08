@@ -111,7 +111,7 @@ function run(
     child.stderr.resume();
 
     child.on('error', (error) => {
-      finish(() => reject(new RipgrepError(`ripgrep 실행 실패: ${error.message}`)));
+      finish(() => reject(new RipgrepError(`Failed to run ripgrep: ${error.message}`)));
     });
 
     child.on('close', (code) => {
@@ -119,7 +119,7 @@ function run(
       // SIGKILL로 끊은 경우 code는 null이며 이는 정상적인 조기 종료다.
       finish(() => {
         if (code !== null && code > 1) {
-          reject(new RipgrepError(`ripgrep이 코드 ${code}로 종료했습니다`));
+          reject(new RipgrepError(`ripgrep exited with code ${code}`));
           return;
         }
         resolve({ stdout: Buffer.concat(chunks).toString('utf8'), truncation });
