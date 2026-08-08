@@ -1,6 +1,7 @@
 import * as crypto from 'node:crypto';
 import * as vscode from 'vscode';
 import { readConfig, type ApprovalMode } from '../config';
+import { LANGUAGES, LANGUAGE_LABELS, isLang, t, type Lang } from '../i18n';
 import { CONNECTOR_SETUP_PATH } from '../instructions';
 import { MCP_ENDPOINT } from '../mcp/http';
 import type { ActivityEntry } from '../mcp/tools/types';
@@ -70,6 +71,13 @@ export class BridgeViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (message.type === 'setLanguage') {
+      await vscode.workspace
+        .getConfiguration('gptBridge')
+        .update('language', message.value, vscode.ConfigurationTarget.Global);
+      return;
+    }
+
     if (message.type === 'showDetail') {
       await vscode.commands.executeCommand('gptBridge.showLog');
     }
@@ -82,7 +90,7 @@ export class BridgeViewProvider implements vscode.WebviewViewProvider {
   }
 
   pushActivity(entry: ActivityEntry): void {
-    const time = new Date().toLocaleTimeString('ko-KR', {
+    const time = new Date().toLocaleTimeString(undefined, {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false
@@ -191,6 +199,7 @@ export class BridgeViewProvider implements vscode.WebviewViewProvider {
   button.primary:hover { background: var(--vscode-button-hoverBackground); }
   button.block { display: block; width: 100%; margin-bottom: 6px; }
   select, input[type=checkbox] { font-family: inherit; font-size: inherit; }
+  select.lang { width: auto; min-width: 96px; padding: 2px 4px; font-size: 11px; }
   select {
     width: 100%; padding: 3px 4px;
     color: var(--vscode-dropdown-foreground);
@@ -220,76 +229,81 @@ export class BridgeViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
   <section>
+    <div class="row between" style="margin-bottom:8px">
+      <span class="muted" style="font-size:11px">${t('panel.language')}</span>
+      <select id="language" class="lang" title="${t('panel.language')}">
+        ${LANGUAGES.map((code) => languageOption(code, config.language)).join('')}
+      </select>
+    </div>
     <div class="row between">
       <span class="status"><span class="dot"></span>${escapeHtml(describe(state))}</span>
       <button class="${running ? '' : 'primary'}" data-command="${running ? 'gptBridge.stop' : 'gptBridge.start'}">
-        ${running ? '중지' : '시작'}
+        ${running ? t('panel.stop') : t('panel.start')}
       </button>
     </div>
     ${state.message === undefined ? '' : `<div class="warn">${escapeHtml(state.message)}</div>`}
   </section>
 
   <section>
-    <h2>커넥터</h2>
-    <label class="field">커넥터 URL</label>
+    <h2>${t('panel.connector')}</h2>
+    <label class="field">${t('panel.connectorUrl')}</label>
     <div class="row">
-      <span class="value">${connectorUrl === undefined ? '서버가 실행 중이 아닙니다' : escapeHtml(connectorUrl)}</span>
-      <button data-command="gptBridge.copyUrl">복사</button>
+      <span class="value">${connectorUrl === undefined ? t('panel.notRunning') : escapeHtml(connectorUrl)}</span>
+      <button data-command="gptBridge.copyUrl">${t('panel.copy')}</button>
     </div>
 
-    <label class="field">인증 토큰</label>
+    <label class="field">${t('panel.authToken')}</label>
     <div class="row">
-      <span class="value">${this.tokenPreview === undefined ? '아직 발급되지 않음' : escapeHtml(this.tokenPreview)}</span>
-      <button data-command="gptBridge.copyToken">복사</button>
+      <span class="value">${this.tokenPreview === undefined ? t('panel.noToken') : escapeHtml(this.tokenPreview)}</span>
+      <button data-command="gptBridge.copyToken">${t('panel.copy')}</button>
     </div>
 
     <div style="margin-top:10px">
-      <button class="block primary" data-command="gptBridge.copyInstructions">ChatGPT 지침 복사</button>
+      <button class="block primary" data-command="gptBridge.copyInstructions">${t('panel.copyInstructions')}</button>
     </div>
 
     ${
       isLocalOnly
-        ? `<div class="warn">터널이 연결되지 않아 로컬 주소만 사용할 수 있습니다. ChatGPT 웹에서는 접근할 수 없고, MCP Inspector 같은 로컬 도구로만 확인할 수 있습니다.</div>`
+        ? `<div class="warn">${t('panel.localOnly')}</div>`
         : ''
     }
     ${
       isExternalTunnel
-        ? `<div class="info">확장이 터널을 만들지 않는 구성입니다 (<code>tunnel.provider = none</code>). 위 주소는 로컬 엔드포인트이며, <b>OpenAI Secure MCP Tunnel</b> 같은 외부 터널을 따로 띄워 두었다면 ChatGPT에서 접근할 수 있습니다. 외부 터널의 연결 상태는 확장이 알 수 없으니 그쪽 도구에서 확인하세요.</div>`
+        ? `<div class="info">${t('panel.externalTunnel')}</div>`
         : ''
     }
     ${
       quickTunnel
-        ? `<div class="warn">Quick Tunnel은 재시작할 때마다 URL이 바뀌어 ChatGPT 커넥터를 매번 다시 등록해야 합니다. 실사용에는 Named Tunnel을 권장합니다 — <code>GPT Bridge: 터널 토큰 설정</code> 실행 후 <code>gptBridge.tunnel.hostname</code>에 공개 호스트명을 지정하세요.</div>`
+        ? `<div class="warn">${t('panel.quickTunnel')}</div>`
         : ''
     }
     <p class="muted" style="margin:10px 0 0; line-height:1.5">
-      ChatGPT 등록 경로: ${escapeHtml(CONNECTOR_SETUP_PATH)}
+      ${escapeHtml(t('panel.setupPath', CONNECTOR_SETUP_PATH))}
     </p>
   </section>
 
   <section>
-    <h2>동작</h2>
-    <label class="field" for="approval">승인 모드</label>
+    <h2>${t('panel.behavior')}</h2>
+    <label class="field" for="approval">${t('panel.approvalMode')}</label>
     <select id="approval">
-      ${approvalOption('always', '항상 확인', config.approvalMode)}
-      ${approvalOption('session', '세션 자동 승인', config.approvalMode)}
-      ${approvalOption('pattern', '패턴 자동 승인', config.approvalMode)}
+      ${approvalOption('always', t('panel.modeAlways'), config.approvalMode)}
+      ${approvalOption('session', t('panel.modeSession'), config.approvalMode)}
+      ${approvalOption('pattern', t('panel.modePattern'), config.approvalMode)}
     </select>
     <div class="check">
       <input type="checkbox" id="autosave" ${config.autoSave ? 'checked' : ''}>
-      <label for="autosave">수정 후 자동 저장</label>
+      <label for="autosave">${t('panel.autoSave')}</label>
     </div>
     <p class="muted" style="margin:6px 0 0; line-height:1.5">
-      자동 저장을 끄면 Ctrl+S 전까지 디스크에 반영되지 않습니다(권장).
-      단, 파일 생성·삭제는 승인 즉시 디스크에 반영됩니다.
+      ${escapeHtml(t('panel.autoSaveHint'))}
     </p>
   </section>
 
   <section>
-    <h2>활동</h2>
+    <h2>${t('panel.activity')}</h2>
     ${
       this.activity.length === 0
-        ? '<p class="muted">아직 호출된 툴이 없습니다.</p>'
+        ? `<p class="muted">${t('panel.noActivity')}</p>`
         : `<ul class="activity">${this.activity.map(activityRow).join('')}</ul>`
     }
   </section>
@@ -305,6 +319,10 @@ export class BridgeViewProvider implements vscode.WebviewViewProvider {
 
     document.getElementById('approval').addEventListener('change', (event) => {
       vscodeApi.postMessage({ type: 'setApprovalMode', value: event.target.value });
+    });
+
+    document.getElementById('language').addEventListener('change', (event) => {
+      vscodeApi.postMessage({ type: 'setLanguage', value: event.target.value });
     });
 
     document.getElementById('autosave').addEventListener('change', (event) => {
@@ -324,6 +342,12 @@ export class BridgeViewProvider implements vscode.WebviewViewProvider {
 
 function approvalOption(value: ApprovalMode, label: string, current: ApprovalMode): string {
   return `<option value="${value}"${value === current ? ' selected' : ''}>${label}</option>`;
+}
+
+/** 언어 이름은 그 언어로 적는다. 못 읽는 언어로 표시하면 되돌아올 수 없다. */
+function languageOption(value: Lang, current: Lang): string {
+  const selected = value === current ? ' selected' : '';
+  return `<option value="${value}"${selected}>${LANGUAGE_LABELS[value]}</option>`;
 }
 
 function activityRow(entry: ActivityRow): string {
@@ -373,6 +397,7 @@ type PanelMessage =
   | { type: 'command'; command: string }
   | { type: 'setApprovalMode'; value: ApprovalMode }
   | { type: 'setAutoSave'; value: boolean }
+  | { type: 'setLanguage'; value: Lang }
   | { type: 'showDetail' };
 
 function isPanelMessage(value: unknown): value is PanelMessage {
@@ -389,6 +414,8 @@ function isPanelMessage(value: unknown): value is PanelMessage {
       return record.value === 'always' || record.value === 'session' || record.value === 'pattern';
     case 'setAutoSave':
       return typeof record.value === 'boolean';
+    case 'setLanguage':
+      return typeof record.value === 'string' && isLang(record.value);
     case 'showDetail':
       return true;
     default:

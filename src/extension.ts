@@ -4,6 +4,7 @@ import { AuditLog } from './audit/AuditLog';
 import { createVscodeApprovalGate, type PendingPreview } from './approval/vscodeGate';
 import { registerCommands } from './commands';
 import { onConfigChange, readConfig } from './config';
+import { setLanguage } from './i18n';
 import { BridgeServer } from './mcp/McpServer';
 import { SecretStore } from './secrets';
 import { BridgeStateStore } from './state';
@@ -23,6 +24,10 @@ export function activate(context: vscode.ExtensionContext): void {
   // 확장 호스트는 리로드가 잦아 정리 누락 시 포트·프로세스가 누수된다.
   const log = createLogger();
   context.subscriptions.push(log);
+
+  // UI를 만들기 전에 언어를 확정한다. 뒤에 하면 상태바와 패널이 한 번
+  // 영어로 그려졌다가 바뀌어 깜빡인다.
+  setLanguage(readConfig().language);
 
   const store = new BridgeStateStore();
   const statusBar = new StatusBar();
@@ -97,7 +102,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     onConfigChange((config) => {
-      log.info(`설정 변경 감지 — port=${config.port}, approval=${config.approvalMode}`);
+      log.info(`Configuration changed - port=${config.port}, approval=${config.approvalMode}`);
+      // 언어를 먼저 반영해야 아래 다시 그리기와 상태바가 새 언어로 나온다.
+      setLanguage(config.language);
+      statusBar.update(store.current);
       // 패널의 승인 모드·자동 저장 표시가 설정과 어긋나지 않게 다시 그린다.
       view.render(store.current);
     })
@@ -105,19 +113,19 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const config = readConfig();
   log.info(
-    `GPT Bridge 활성화됨 — port=${config.port}, autoStart=${config.autoStart}, ` +
-      `tunnel=${config.tunnelProvider}, approval=${config.approvalMode}`
+    `GPT Bridge activated - port=${config.port}, autoStart=${config.autoStart}, ` +
+      `tunnel=${config.tunnelProvider}, approval=${config.approvalMode}, lang=${config.language}`
   );
 
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
-    log.warn('열린 워크스페이스 폴더가 없습니다. 파일 툴은 워크스페이스가 있어야 동작합니다.');
+    log.warn('No workspace folder is open. File tools need a workspace to operate on.');
   } else {
-    log.info(`워크스페이스: ${folder.name}`);
+    log.info(`Workspace: ${folder.name}`);
   }
 
   if (config.autoStart && folder !== undefined) {
-    log.info('autoStart가 켜져 있어 서버를 시작합니다.');
+    log.info('autoStart is enabled - starting the server.');
     void server.start();
   }
 }

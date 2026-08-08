@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { ApprovalGate, type ApprovalRequest, type PromptChoice } from './ApprovalGate';
 import { DiffPreview } from './DiffPreview';
 import { readConfig } from '../config';
+import { t } from '../i18n';
 
 /** 승인 요청 1건에 필요한, 미리보기에 쓸 내용. */
 export interface PendingPreview {
@@ -37,14 +38,14 @@ export function createVscodeApprovalGate(
       const choice = await vscode.window.showInformationMessage(
         promptText(request),
         { modal: true, detail: promptDetail(request) },
-        '적용',
-        'Diff 보기'
+        t('approval.apply'),
+        t('approval.viewDiff')
       );
 
-      if (choice === '적용') {
+      if (choice === t('approval.apply')) {
         return 'apply';
       }
-      if (choice === 'Diff 보기') {
+      if (choice === t('approval.viewDiff')) {
         return 'diff';
       }
       // 모달의 '취소'와 Esc는 모두 undefined로 온다. 거부로 취급한다.
@@ -54,7 +55,7 @@ export function createVscodeApprovalGate(
     showDiff: async (request): Promise<void> => {
       const preview = previews.get(request.id);
       if (preview === undefined) {
-        void vscode.window.showWarningMessage('GPT Bridge: 미리보기 내용을 찾을 수 없습니다.');
+        void vscode.window.showWarningMessage(t('approval.previewMissing'));
         return;
       }
       const original = preview.original ?? diffPreview.emptyUri(request.id, request.relPath);
@@ -62,14 +63,9 @@ export function createVscodeApprovalGate(
     },
 
     onExpiredChoice: (request, choice): void => {
-      log.warn(
-        `만료된 승인 요청에 대한 선택을 무시했습니다 (id=${request.id}, choice=${choice})`
-      );
+      log.warn(`Ignored a choice on an expired approval request (id=${request.id}, choice=${choice})`);
       onExpiredChoiceAudit(request, choice);
-      void vscode.window.showWarningMessage(
-        `GPT Bridge: 승인 대기 시간이 지난 요청이라 "${request.relPath}" 수정을 적용하지 않았습니다. ` +
-          `필요하면 GPT에게 다시 요청하세요.`
-      );
+      void vscode.window.showWarningMessage(t('approval.expired', request.relPath));
     },
 
     log: {
@@ -81,12 +77,12 @@ export function createVscodeApprovalGate(
 
 function promptText(request: ApprovalRequest): string {
   if (request.tool === 'delete_path') {
-    return `GPT가 ${request.relPath} 삭제를 요청했습니다.`;
+    return t('approval.deleteRequest', request.relPath);
   }
   if (request.tool === 'create_directory') {
-    return `GPT가 디렉터리 ${request.relPath} 생성을 요청했습니다.`;
+    return t('approval.createDirRequest', request.relPath);
   }
-  return `GPT가 ${request.relPath} 수정을 요청했습니다 (${request.summary}).`;
+  return t('approval.editRequest', request.relPath, request.summary);
 }
 
 /**
@@ -96,8 +92,8 @@ function promptText(request: ApprovalRequest): string {
 function promptDetail(request: ApprovalRequest): string {
   if (request.diskImmediate) {
     return request.tool === 'delete_path'
-      ? '이 작업은 승인 즉시 디스크에 반영됩니다(가능하면 휴지통으로 이동). Ctrl+Z로 완전히 되돌아가지 않습니다.'
-      : '이 작업은 승인 즉시 디스크에 반영됩니다. Ctrl+Z로 완전히 되돌아가지 않습니다.';
+      ? t('approval.detailDiskTrash')
+      : t('approval.detailDisk');
   }
-  return '에디터 버퍼에만 적용됩니다. Ctrl+Z로 되돌릴 수 있고, 저장 전까지 디스크는 변경되지 않습니다.';
+  return t('approval.detailBuffer');
 }

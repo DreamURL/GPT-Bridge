@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { isLang, type Lang } from './i18n';
 
 export const CONFIG_SECTION = 'gptBridge';
 
@@ -16,6 +17,7 @@ export interface BridgeConfig {
   readonly autoSave: boolean;
   readonly denyExtraPatterns: readonly string[];
   readonly maxReadBytes: number;
+  readonly language: Lang;
 }
 
 function isApprovalMode(value: string): value is ApprovalMode {
@@ -48,6 +50,7 @@ export function readConfig(): BridgeConfig {
 
   const rawApprovalMode = cfg.get<string>('approval.mode', 'always');
   const rawProvider = cfg.get<string>('tunnel.provider', 'cloudflare');
+  const rawLanguage = cfg.get<string>('language', 'en');
 
   return {
     port: cfg.get<number>('port', 3737),
@@ -59,7 +62,9 @@ export function readConfig(): BridgeConfig {
     approvalTimeoutSeconds: cfg.get<number>('approval.timeoutSeconds', 90),
     autoSave: cfg.get<boolean>('autoSave', false),
     denyExtraPatterns: stringArray(cfg.get<unknown[]>('deny.extraPatterns', [])),
-    maxReadBytes: cfg.get<number>('maxReadBytes', 1048576)
+    maxReadBytes: cfg.get<number>('maxReadBytes', 1048576),
+    // 알 수 없는 값은 영어로 떨어뜨린다. 기본 언어가 비는 것보다 낫다.
+    language: isLang(rawLanguage) ? rawLanguage : 'en'
   };
 }
 

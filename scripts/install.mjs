@@ -19,8 +19,8 @@ const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const vsix = join(root, `${pkg.name}-${pkg.version}.vsix`);
 
 if (!existsSync(vsix)) {
-  console.error(`\n  ${pkg.name}-${pkg.version}.vsix 를 찾을 수 없습니다.`);
-  console.error('  먼저 빌드하세요:  npm run package\n');
+  console.error(`\n  Could not find ${pkg.name}-${pkg.version}.vsix`);
+  console.error('  Build it first:  npm run package\n');
   process.exit(1);
 }
 
@@ -37,18 +37,18 @@ try {
   // `code`가 PATH에 없는 것이 대부분이다. 설치 자체는 GUI로도 되므로
   // 실패를 막다른 길로 만들지 않는다.
   console.error('\n  ------------------------------------------------------------');
-  console.error('  자동 설치에 실패했습니다. code 명령을 찾지 못했을 가능성이 큽니다.');
+  console.error('  Automatic install failed. The "code" command was probably not found.');
   console.error('');
-  console.error('  VS Code 화면에서 직접 설치할 수 있습니다:');
-  console.error('    확장 패널 → 오른쪽 위 ... → VSIX에서 설치 →');
+  console.error('  You can install it from the VS Code UI instead:');
+  console.error('    Extensions panel -> ... (top right) -> Install from VSIX ->');
   console.error(`    ${vsix}`);
   console.error('');
-  console.error('  code 명령을 쓰려면 VS Code에서 Ctrl+Shift+P →');
+  console.error('  To enable the "code" command, run Ctrl+Shift+P in VS Code:');
   console.error("    \"Shell Command: Install 'code' command in PATH\"");
-  console.error('  (Windows는 설치할 때 PATH 추가 옵션을 켰다면 이미 있습니다)');
+  console.error('  (On Windows it is already available if you enabled the PATH option at install time.)');
   console.error('  ------------------------------------------------------------\n');
   process.exit(1);
 }
 
-console.log(`\n  설치 완료: ${pkg.name}@${pkg.version}`);
-console.log('  VS Code에서 Developer: Reload Window 를 한 번 실행하세요.\n');
+console.log(`\n  Installed: ${pkg.name}@${pkg.version}`);
+console.log('  Run "Developer: Reload Window" in VS Code once to activate it.\n');

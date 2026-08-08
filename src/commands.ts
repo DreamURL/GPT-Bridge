@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { t } from './i18n';
 import { CHATGPT_INSTRUCTIONS, CONNECTOR_SETUP_PATH } from './instructions';
 import type { BridgeServer } from './mcp/McpServer';
 import { MCP_ENDPOINT } from './mcp/http';
@@ -20,11 +21,11 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
   const register = (id: string, handler: () => void | Promise<void>): void => {
     context.subscriptions.push(
       vscode.commands.registerCommand(id, () => {
-        log.debug(`명령 실행: ${id}`);
+        log.debug(`Command invoked: ${id}`);
         void Promise.resolve(handler()).catch((error: unknown) => {
           const reason = error instanceof Error ? error.message : String(error);
-          log.error(`명령 실패: ${id} — ${reason}`);
-          void vscode.window.showErrorMessage(`GPT Bridge: ${reason}`);
+          log.error(`Command failed: ${id} - ${reason}`);
+          void vscode.window.showErrorMessage(t('cmd.error', reason));
         });
       })
     );
@@ -37,11 +38,11 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
 
   register('gptBridge.stop', async () => {
     if (!server.isRunning) {
-      void vscode.window.showInformationMessage('GPT Bridge: 실행 중인 서버가 없습니다.');
+      void vscode.window.showInformationMessage(t('cmd.serverNotRunningInfo'));
       return;
     }
     await server.stop();
-    void vscode.window.showInformationMessage('GPT Bridge: 서버를 중지했습니다.');
+    void vscode.window.showInformationMessage(t('cmd.serverStopped'));
   });
 
   register('gptBridge.copyUrl', async () => {
@@ -50,15 +51,14 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
     // 터널이 아직 안 붙었으면 로컬 주소를 준다 — MCP Inspector로 확인할 때 필요하다.
     const url = tunnelUrl ?? (port === undefined ? undefined : `http://127.0.0.1:${port}${MCP_ENDPOINT}`);
     if (url === undefined) {
-      void vscode.window.showWarningMessage(
-        'GPT Bridge: 서버가 실행 중이 아닙니다. 먼저 "서버 시작"을 실행하세요.'
-      );
+      void vscode.window.showWarningMessage(t('cmd.startFirst'));
       return;
     }
 
     await vscode.env.clipboard.writeText(url);
-    const kind = tunnelUrl === undefined ? '로컬 엔드포인트' : '커넥터 URL';
-    void vscode.window.showInformationMessage(`GPT Bridge: ${kind}를 복사했습니다 — ${url}`);
+    void vscode.window.showInformationMessage(
+      tunnelUrl === undefined ? t('cmd.copiedLocal', url) : t('cmd.copiedConnector', url)
+    );
   });
 
   // ── 토큰 ────────────────────────────────────────────────────────
@@ -66,20 +66,18 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
     const token = await secrets.ensureAuthToken();
     onTokenChanged(token);
     await vscode.env.clipboard.writeText(token);
-    log.info(`인증 토큰을 클립보드에 복사했습니다 (${maskToken(token)})`);
-    void vscode.window.showInformationMessage(
-      'GPT Bridge: 인증 토큰을 복사했습니다. ChatGPT 커넥터의 인증 헤더에 붙여 넣으세요.'
-    );
+    log.info(`Auth token copied to clipboard (${maskToken(token)})`);
+    void vscode.window.showInformationMessage(t('cmd.tokenCopied'));
   });
 
   register('gptBridge.regenerateToken', async () => {
     const confirmed = await vscode.window.showWarningMessage(
-      '인증 토큰을 재발급하면 기존 토큰으로 연결된 ChatGPT 커넥터는 즉시 접근할 수 없게 됩니다. 계속할까요?',
+      t('cmd.regenConfirm'),
       { modal: true },
-      '재발급'
+      t('cmd.regenButton')
     );
-    if (confirmed !== '재발급') {
-      log.info('토큰 재발급 취소됨');
+    if (confirmed !== t('cmd.regenButton')) {
+      log.info('Token regeneration cancelled');
       return;
     }
 
@@ -87,18 +85,16 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
     onTokenChanged(token);
     await server.refreshToken(); // 실행 중이면 기존 토큰을 즉시 무효화한다
     await vscode.env.clipboard.writeText(token);
-    log.warn(`인증 토큰이 재발급되었습니다 (${maskToken(token)})`);
-    void vscode.window.showInformationMessage(
-      'GPT Bridge: 토큰을 재발급하고 클립보드에 복사했습니다. ChatGPT 커넥터 설정을 갱신하세요.'
-    );
+    log.warn(`Auth token regenerated (${maskToken(token)})`);
+    void vscode.window.showInformationMessage(t('cmd.tokenRegenerated'));
   });
 
   register('gptBridge.setTunnelToken', async () => {
     const existing = await secrets.getTunnelToken();
     const input = await vscode.window.showInputBox({
-      title: 'Cloudflare Named Tunnel 토큰',
-      prompt: '비워 두고 확인하면 저장된 토큰을 삭제합니다.',
-      placeHolder: existing === undefined ? '토큰 붙여넣기' : '저장된 토큰이 있습니다',
+      title: t('cmd.tunnelTokenTitle'),
+      prompt: t('cmd.tunnelTokenPrompt'),
+      placeHolder: existing === undefined ? t('cmd.tunnelTokenPaste') : t('cmd.tunnelTokenStored'),
       password: true,
       ignoreFocusOut: true
     });
@@ -110,22 +106,22 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
     const trimmed = input.trim();
     if (trimmed.length === 0) {
       await secrets.clearTunnelToken();
-      log.info('터널 토큰을 삭제했습니다');
-      void vscode.window.showInformationMessage('GPT Bridge: 터널 토큰을 삭제했습니다.');
+      log.info('Tunnel token deleted');
+      void vscode.window.showInformationMessage(t('cmd.tunnelTokenDeleted'));
       return;
     }
 
     await secrets.setTunnelToken(trimmed);
-    log.info('터널 토큰을 저장했습니다');
+    log.info('Tunnel token saved');
 
     const message = server.isRunning
-      ? 'GPT Bridge: 터널 토큰을 저장했습니다. 적용하려면 서버를 다시 시작하세요.'
-      : 'GPT Bridge: 터널 토큰을 저장했습니다. 공개 호스트명은 gptBridge.tunnel.hostname 설정에 지정하세요.';
+      ? t('cmd.tunnelTokenSavedRunning')
+      : t('cmd.tunnelTokenSaved');
     const choice = await vscode.window.showInformationMessage(
       message,
-      ...(server.isRunning ? ['다시 시작'] : [])
+      ...(server.isRunning ? [t('cmd.restart')] : [])
     );
-    if (choice === '다시 시작') {
+    if (choice === t('cmd.restart')) {
       await server.stop();
       await server.start();
     }
@@ -134,9 +130,7 @@ export function registerCommands(context: vscode.ExtensionContext, deps: Command
   // ── 안내 ────────────────────────────────────────────────────────
   register('gptBridge.copyInstructions', async () => {
     await vscode.env.clipboard.writeText(CHATGPT_INSTRUCTIONS);
-    void vscode.window.showInformationMessage(
-      `GPT Bridge: ChatGPT 지침을 복사했습니다. 등록 경로 — ${CONNECTOR_SETUP_PATH}`
-    );
+    void vscode.window.showInformationMessage(t('cmd.instructionsCopied', CONNECTOR_SETUP_PATH));
   });
 
   register('gptBridge.showLog', () => {
