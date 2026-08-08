@@ -192,7 +192,10 @@ health:
   listen_addr: "127.0.0.1:8080"
 
 log:
+  # level과 format은 짝입니다. format을 빼면 tunnel-client가
+  # "log level requires 'struct-text' or 'json' log format"으로 시작을 거부합니다.
   level: warn
+  format: json
 
 mcp:
   server_urls:

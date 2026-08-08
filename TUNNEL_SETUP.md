@@ -280,7 +280,10 @@ admin_ui:
   open_browser: false
 
 log:
+  # level and format must be set together. Omit format and tunnel-client
+  # refuses to start with "log level requires 'struct-text' or 'json' log format".
   level: warn
+  format: json
 
 mcp:
   server_urls:
@@ -509,7 +512,12 @@ One line in `gpt-bridge.yaml`:
 ```yaml
 log:
   level: warn      # info -> warn. Only prints when something is wrong.
+  format: json     # required whenever level is set. 'struct-text' also works.
 ```
+
+> **`level` and `format` are a pair.** Setting `level` without `format` makes
+> `doctor` fail with `log level requires 'struct-text' or 'json' log format`,
+> and `run` refuses to start.
 
 ### Other things to check
 

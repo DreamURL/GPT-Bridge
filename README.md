@@ -195,7 +195,10 @@ health:
   listen_addr: "127.0.0.1:8080"
 
 log:
+  # level and format must be set together. Omit format and tunnel-client
+  # refuses to start with "log level requires 'struct-text' or 'json' log format".
   level: warn
+  format: json
 
 mcp:
   server_urls:
