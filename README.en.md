@@ -104,19 +104,25 @@ Grab the single zip for your OS from the
 [releases page](https://github.com/openai/tunnel-client/releases)
 (`windows-amd64` for most Windows PCs).
 
-**Verify the hash before running it.** Compare against `SHA256SUMS.txt` on the
-same page.
+**Before extracting**, hash the **zip file itself** and compare it against
+`SHA256SUMS.txt` on the same page.
 
-```powershell
-# Windows
-certutil -hashfile "<path to zip>" SHA256
+```cmd
+:: Windows — the path must end in .zip
+certutil -hashfile "C:\...\tunnel-client-v0.0.11-windows-amd64.zip" SHA256
 ```
 ```bash
 # macOS / Linux
-shasum -a 256 "<path to zip>"
+shasum -a 256 "~/Downloads/tunnel-client-v0.0.11-windows-amd64.zip"
 ```
 
-Stop if the values differ. Extract anywhere **outside the repository**.
+> `ERROR_FILE_NOT_FOUND` means you pointed at a **folder**. This command hashes a
+> single file, so it must point at the **zip**, not the extracted directory — and
+> the values in `SHA256SUMS.txt` are for the zip, so extracted files will never match.
+>
+> To locate the zip: `dir /s /b "%USERPROFILE%\*tunnel-client*.zip"`.
+
+Stop if the values differ. If they match, extract anywhere **outside the repository**.
 
 ### 4. Write the config file
 

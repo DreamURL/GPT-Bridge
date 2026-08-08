@@ -104,19 +104,26 @@ ChatGPT ──(認証: なし)──▶ OpenAI トンネル ◀──(外向き�
 [リリースページ](https://github.com/openai/tunnel-client/releases)から自分の OS 用の
 zip を 1 つだけ取得します（Windows なら多くの場合 `windows-amd64`）。
 
-**実行する前にハッシュを確認してください。** 同じページの `SHA256SUMS.txt` と
-照合します。
+**展開する前に**、受け取った **zip ファイルそのもの**のハッシュを確認し、同じ
+ページの `SHA256SUMS.txt` と照合します。
 
-```powershell
-# Windows
-certutil -hashfile "<zip のパス>" SHA256
+```cmd
+:: Windows — パスの末尾は .zip である必要があります
+certutil -hashfile "C:\...\tunnel-client-v0.0.11-windows-amd64.zip" SHA256
 ```
 ```bash
 # macOS / Linux
-shasum -a 256 "<zip のパス>"
+shasum -a 256 "~/Downloads/tunnel-client-v0.0.11-windows-amd64.zip"
 ```
 
-値が違ったら中断してください。展開先は**リポジトリの外**であればどこでも構いません。
+> `ERROR_FILE_NOT_FOUND` が出たら、**フォルダを指定している**ということです。この
+> コマンドはファイル 1 つのハッシュを求めるので、展開したフォルダではなく **zip**
+> を指す必要があります。`SHA256SUMS.txt` の値も zip 基準なので、展開後の中身とは
+> 照合できません。
+>
+> zip を探すには `dir /s /b "%USERPROFILE%\*tunnel-client*.zip"`。
+
+値が違ったら中断してください。一致したら**リポジトリの外**の任意のフォルダに展開します。
 
 ### 4. 設定ファイルを作る
 

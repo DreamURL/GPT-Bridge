@@ -100,18 +100,25 @@ ChatGPT ──(认证：无)──▶ OpenAI 隧道 ◀──(出站连接)─�
 在[发布页面](https://github.com/openai/tunnel-client/releases)只下载对应自己
 操作系统的那一个 zip（Windows 大多是 `windows-amd64`）。
 
-**运行之前请核对哈希。** 与同一页面上的 `SHA256SUMS.txt` 比对。
+**解压之前**，先对下载到的 **zip 文件本身**求哈希，并与同一页面上的
+`SHA256SUMS.txt` 比对。
 
-```powershell
-# Windows
-certutil -hashfile "<zip 路径>" SHA256
+```cmd
+:: Windows —— 路径必须以 .zip 结尾
+certutil -hashfile "C:\...\tunnel-client-v0.0.11-windows-amd64.zip" SHA256
 ```
 ```bash
 # macOS / Linux
-shasum -a 256 "<zip 路径>"
+shasum -a 256 "~/Downloads/tunnel-client-v0.0.11-windows-amd64.zip"
 ```
 
-数值不一致就停下。解压到**仓库之外**的任意文件夹即可。
+> 出现 `ERROR_FILE_NOT_FOUND` 说明你指向的是**文件夹**。这个命令只对单个文件求
+> 哈希，因此必须指向 **zip**，而不是解压后的目录 —— `SHA256SUMS.txt` 里的值也是
+> 针对 zip 的，解压出来的文件永远对不上。
+>
+> 查找 zip：`dir /s /b "%USERPROFILE%\*tunnel-client*.zip"`。
+
+数值不一致就停下。一致的话，解压到**仓库之外**的任意文件夹即可。
 
 ### 4. 编写配置文件
 

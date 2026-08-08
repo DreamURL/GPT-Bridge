@@ -101,18 +101,25 @@ ChatGPT ──(인증: 없음)──▶ OpenAI 터널 ◀──(나가는 연결
 [릴리스 페이지](https://github.com/openai/tunnel-client/releases)에서 자기 OS용
 zip 하나만 받습니다 (Windows 대부분 `windows-amd64`).
 
-**실행 전에 해시를 확인하세요.** 같은 페이지의 `SHA256SUMS.txt`와 대조합니다.
+**압축을 풀기 전에**, 받은 **zip 파일 자체**의 해시를 확인하고 같은 페이지의
+`SHA256SUMS.txt`와 대조합니다.
 
-```powershell
-# Windows
-certutil -hashfile "<받은 zip 경로>" SHA256
+```cmd
+:: Windows — 경로 끝이 .zip 이어야 합니다
+certutil -hashfile "C:\...\tunnel-client-v0.0.11-windows-amd64.zip" SHA256
 ```
 ```bash
 # macOS / Linux
-shasum -a 256 "<받은 zip 경로>"
+shasum -a 256 "~/Downloads/tunnel-client-v0.0.11-windows-amd64.zip"
 ```
 
-값이 다르면 멈추세요. 압축은 **저장소 밖** 아무 폴더에나 풉니다.
+> `ERROR_FILE_NOT_FOUND`가 나오면 **폴더 경로를 넣은 것**입니다. 이 명령은 파일
+> 하나의 해시를 구하므로 압축을 푼 폴더가 아니라 **zip 파일**을 가리켜야 합니다.
+> `SHA256SUMS.txt`의 값도 zip 기준이라 내용물과는 대조할 수 없습니다.
+>
+> zip을 찾으려면 `dir /s /b "%USERPROFILE%\*tunnel-client*.zip"`.
+
+값이 다르면 멈추세요. 같으면 **저장소 밖** 아무 폴더에나 압축을 풉니다.
 
 ### 4. 설정 파일 만들기
 
