@@ -130,12 +130,21 @@ shasum -a 256 "~/Downloads/tunnel-client-v0.0.11-windows-amd64.zip"
 **폴더부터 직접 만들어야 합니다.** `tunnel-client`를 아직 실행한 적이 없어
 아무것도 만들어져 있지 않습니다.
 
-`Win + R` → `%APPDATA%` → 탐색기가 열리면 그 안에 **우클릭 → 새로 만들기 →
-폴더** → 이름을 **`tunnel-client`** 로. 그 안에 아래 내용을 `gpt-bridge.yaml`로
-저장합니다.
+`Win + R` → `%APPDATA%` 입력 → 이 폴더가 열립니다.
 
 ```
-Windows       %APPDATA%\tunnel-client\gpt-bridge.yaml
+C:\Users\<사용자이름>\AppData\Roaming
+```
+
+> ⚠️ **`%APPDATA%`는 `AppData` 폴더가 아니라 그 아래 `Roaming`을 가리킵니다.**
+> `AppData\tunnel-client`가 아니라 `AppData\Roaming\tunnel-client`입니다.
+> 위 방법으로 열면 이미 맞는 위치이니 거기서 바로 만드시면 됩니다.
+
+열린 폴더에서 **우클릭 → 새로 만들기 → 폴더** → 이름을 **`tunnel-client`** 로.
+그 안에 아래 내용을 `gpt-bridge.yaml`로 저장합니다. 최종 경로는 이렇게 됩니다.
+
+```
+Windows       C:\Users\<사용자이름>\AppData\Roaming\tunnel-client\gpt-bridge.yaml
 macOS/Linux   ~/.config/tunnel-client/gpt-bridge.yaml
 ```
 

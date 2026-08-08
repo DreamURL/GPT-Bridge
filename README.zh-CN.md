@@ -127,11 +127,21 @@ shasum -a 256 "~/Downloads/tunnel-client-v0.0.11-windows-amd64.zip"
 
 **先自己创建文件夹。** `tunnel-client` 还从未运行过，所以什么都还不存在。
 
-`Win + R` → `%APPDATA%` → 在打开的文件夹里**右键 → 新建 → 文件夹** →
-命名为 **`tunnel-client`**。把下面的内容保存到其中，文件名为 `gpt-bridge.yaml`。
+`Win + R` → 输入 `%APPDATA%` → 会打开这个文件夹：
 
 ```
-Windows       %APPDATA%\tunnel-client\gpt-bridge.yaml
+C:\Users\<用户名>\AppData\Roaming
+```
+
+> ⚠️ **`%APPDATA%` 指的不是 `AppData` 文件夹，而是它下面的 `Roaming`。**
+> 路径是 `AppData\Roaming\tunnel-client`，不是 `AppData\tunnel-client`。
+> 用上面的方式打开时你已经在正确的位置了。
+
+在打开的文件夹里**右键 → 新建 → 文件夹** → 命名为 **`tunnel-client`**。
+把下面的内容保存到其中，文件名为 `gpt-bridge.yaml`。最终路径如下：
+
+```
+Windows       C:\Users\<用户名>\AppData\Roaming\tunnel-client\gpt-bridge.yaml
 macOS/Linux   ~/.config/tunnel-client/gpt-bridge.yaml
 ```
 

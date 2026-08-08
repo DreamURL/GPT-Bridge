@@ -134,12 +134,22 @@ shasum -a 256 "~/Downloads/tunnel-client-v0.0.11-windows-amd64.zip"
 **まずフォルダを自分で作成します。** `tunnel-client` をまだ一度も実行していないため、
 何も用意されていません。
 
-`Win + R` → `%APPDATA%` → 開いたフォルダ内で**右クリック → 新規作成 →
-フォルダー** → 名前を **`tunnel-client`** に。その中に下記の内容を
-`gpt-bridge.yaml` として保存します。
+`Win + R` → `%APPDATA%` と入力 → このフォルダが開きます。
 
 ```
-Windows       %APPDATA%\tunnel-client\gpt-bridge.yaml
+C:\Users\<ユーザー名>\AppData\Roaming
+```
+
+> ⚠️ **`%APPDATA%` は `AppData` フォルダではなく、その下の `Roaming` を指します。**
+> `AppData\tunnel-client` ではなく `AppData\Roaming\tunnel-client` です。
+> 上の方法で開けばすでに正しい場所なので、そこで作成してください。
+
+開いたフォルダ内で**右クリック → 新規作成 → フォルダー** → 名前を
+**`tunnel-client`** に。その中に下記の内容を `gpt-bridge.yaml` として保存します。
+最終的なパスはこうなります。
+
+```
+Windows       C:\Users\<ユーザー名>\AppData\Roaming\tunnel-client\gpt-bridge.yaml
 macOS/Linux   ~/.config/tunnel-client/gpt-bridge.yaml
 ```
 

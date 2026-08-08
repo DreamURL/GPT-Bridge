@@ -206,7 +206,17 @@ zip 파일 **우클릭 → 압축 풀기**. 폴더는 어디든 상관없습니�
 %APPDATA%
 ```
 
-탐색기가 열리면 그 안에 **`tunnel-client`** 라는 폴더를 만듭니다.
+이 폴더가 열립니다.
+
+```
+C:\Users\<사용자이름>\AppData\Roaming
+```
+
+> ⚠️ **`%APPDATA%`는 `AppData` 폴더가 아니라 그 아래 `Roaming`을 가리킵니다.**
+> `AppData\tunnel-client`가 아니라 `AppData\Roaming\tunnel-client`입니다.
+> 위 방법으로 열면 이미 맞는 위치이니 거기서 바로 만드시면 됩니다.
+
+열린 폴더 안에 **`tunnel-client`** 라는 폴더를 만듭니다.
 (우클릭 → 새로 만들기 → 폴더)
 
 ### 파일 만들기

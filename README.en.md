@@ -133,12 +133,21 @@ Stop if the values differ. If they match, extract anywhere **outside the reposit
 **Create the folder yourself first.** `tunnel-client` has never run, so nothing
 exists yet.
 
-`Win + R` → `%APPDATA%` → in the folder that opens, **right-click → New →
-Folder** → name it **`tunnel-client`**. Save the content below inside it as
-`gpt-bridge.yaml`.
+`Win + R` → type `%APPDATA%` → this folder opens:
 
 ```
-Windows       %APPDATA%\tunnel-client\gpt-bridge.yaml
+C:\Users\<username>\AppData\Roaming
+```
+
+> ⚠️ **`%APPDATA%` is not the `AppData` folder — it points at `Roaming` inside it.**
+> The path is `AppData\Roaming\tunnel-client`, not `AppData\tunnel-client`.
+> Opening it the way above already puts you in the right place.
+
+In that folder, **right-click → New → Folder** → name it **`tunnel-client`**.
+Save the content below inside it as `gpt-bridge.yaml`. The final path:
+
+```
+Windows       C:\Users\<username>\AppData\Roaming\tunnel-client\gpt-bridge.yaml
 macOS/Linux   ~/.config/tunnel-client/gpt-bridge.yaml
 ```
 
