@@ -224,10 +224,29 @@ mcp:
 
 ### 6. 터널 실행
 
-```bash
-tunnel-client doctor --profile gpt-bridge --explain   # 설정 점검
-tunnel-client run --profile gpt-bridge                # 실행 (창을 켜 둡니다)
+`tunnel-client`는 PATH에 없습니다. **4단계에서 압축을 푼 폴더**에서 실행해야 하니
+그 폴더에서 터미널을 여세요.
+
+```cmd
+:: Windows
+cd /d "<압축을 푼 폴더>"
+tunnel-client.exe doctor --profile gpt-bridge --explain
+tunnel-client.exe run --profile gpt-bridge
 ```
+```bash
+# macOS / Linux
+cd "<압축을 푼 폴더>"
+./tunnel-client doctor --profile gpt-bridge --explain
+./tunnel-client run --profile gpt-bridge
+```
+
+`doctor`는 설정만 검사하고 아무 데도 연결하지 않습니다. 먼저 돌려서 지적하는 것을
+고친 뒤 `run`으로 넘어가세요. `run`이 실제로 연결을 엽니다.
+
+> **그 창은 켜 둡니다.** 전화를 걸어 놓은 상태라 닫으면 끊깁니다.
+
+매번 치기 번거로우면 실행 파일 옆에 `start-tunnel.bat`을 만들어 두고 더블클릭하면
+됩니다 — [`TUNNEL_SETUP.md`](./TUNNEL_SETUP.md) 참고.
 
 상태 확인: <http://127.0.0.1:8080/ui>
 

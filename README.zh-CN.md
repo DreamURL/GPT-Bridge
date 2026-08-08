@@ -218,10 +218,29 @@ mcp:
 
 ### 6. 运行隧道
 
-```bash
-tunnel-client doctor --profile gpt-bridge --explain   # 检查配置
-tunnel-client run --profile gpt-bridge                # 运行（保持窗口开着）
+`tunnel-client` 不在 PATH 中，必须在**第 4 步解压出来的文件夹**里运行，
+所以请先在该文件夹打开终端。
+
+```cmd
+:: Windows
+cd /d "<解压到的文件夹>"
+tunnel-client.exe doctor --profile gpt-bridge --explain
+tunnel-client.exe run --profile gpt-bridge
 ```
+```bash
+# macOS / Linux
+cd "<解压到的文件夹>"
+./tunnel-client doctor --profile gpt-bridge --explain
+./tunnel-client run --profile gpt-bridge
+```
+
+`doctor` 只检查配置，不会连接任何地方。先运行它，把它指出的问题改掉，再执行 `run`。
+真正建立连接的是 `run`。
+
+> **请保持该窗口开着。** 它维持着这条线路，关掉隧道就断了。
+
+不想每次都敲命令的话，可以在可执行文件旁放一个 `start-tunnel.bat` 双击运行 ——
+参见 [`TUNNEL_SETUP.md`](./TUNNEL_SETUP.md)。
 
 状态页面：<http://127.0.0.1:8080/ui>
 

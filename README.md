@@ -227,10 +227,29 @@ Replace them with what you collected. **Keep the quotation marks.**
 
 ### 6. Run the tunnel
 
-```bash
-tunnel-client doctor --profile gpt-bridge --explain   # check the config
-tunnel-client run --profile gpt-bridge                # run (keep the window open)
+`tunnel-client` is not on your PATH — run it **from the folder you extracted in
+step 4**, so open a terminal there first.
+
+```cmd
+:: Windows
+cd /d "<the folder you extracted to>"
+tunnel-client.exe doctor --profile gpt-bridge --explain
+tunnel-client.exe run --profile gpt-bridge
 ```
+```bash
+# macOS / Linux
+cd "<the folder you extracted to>"
+./tunnel-client doctor --profile gpt-bridge --explain
+./tunnel-client run --profile gpt-bridge
+```
+
+`doctor` only validates the config and connects to nothing, so run it first and
+fix whatever it reports. `run` opens the connection.
+
+> **Leave that window open.** It is holding the call; closing it drops the tunnel.
+
+Tired of typing this every time? Put a small `start-tunnel.bat` next to the
+executable and double-click it instead — see [`TUNNEL_SETUP.md`](./TUNNEL_SETUP.md).
 
 Status page: <http://127.0.0.1:8080/ui>
 

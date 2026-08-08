@@ -229,10 +229,29 @@ mcp:
 
 ### 6. トンネルを起動する
 
-```bash
-tunnel-client doctor --profile gpt-bridge --explain   # 設定を点検
-tunnel-client run --profile gpt-bridge                # 起動（ウィンドウは開いたまま）
+`tunnel-client` は PATH に入っていません。**4 で展開したフォルダ**で実行する
+必要があるので、そのフォルダでターミナルを開いてください。
+
+```cmd
+:: Windows
+cd /d "<展開したフォルダ>"
+tunnel-client.exe doctor --profile gpt-bridge --explain
+tunnel-client.exe run --profile gpt-bridge
 ```
+```bash
+# macOS / Linux
+cd "<展開したフォルダ>"
+./tunnel-client doctor --profile gpt-bridge --explain
+./tunnel-client run --profile gpt-bridge
+```
+
+`doctor` は設定を検査するだけでどこにも接続しません。先に実行して指摘を直してから
+`run` に進んでください。実際に接続を開くのは `run` です。
+
+> **そのウィンドウは開いたままにします。** 電話をつないだ状態なので、閉じると切れます。
+
+毎回入力するのが面倒なら、実行ファイルの隣に `start-tunnel.bat` を置いて
+ダブルクリックできます — [`TUNNEL_SETUP.md`](./TUNNEL_SETUP.md) を参照。
 
 状態確認: <http://127.0.0.1:8080/ui>
 
