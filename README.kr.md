@@ -50,6 +50,7 @@ npm run setup
 > 그 폴더로 들어가야 `npm install`이 제대로 돕니다.
 
 **갱신할 때**는 `git pull && npm install && npm run setup`.
+**지울 때**는 이 문서 아래쪽 *제거* 항목을 보세요.
 
 ### `code` 명령을 찾지 못한다고 나오면
 
@@ -324,6 +325,63 @@ cd "<압축을 푼 폴더>"
 5. 멀티 루트 워크스페이스는 첫 번째 폴더만 대상입니다.
 6. 터미널 명령 실행과 Git 조작 툴은 제공하지 않습니다.
 7. **"저장 전까지 디스크 안전"은 텍스트 수정에만 해당합니다.**
+
+## 제거
+
+확장 ID는 `local.gpt-bridge`입니다.
+
+```bash
+code --uninstall-extension local.gpt-bridge
+```
+
+그다음 `Ctrl+Shift+P` → **`Developer: Reload Window`**.
+
+UI로 하려면 확장 패널(`Ctrl+Shift+X`)에서 **`@installed gpt bridge`**로 검색 →
+항목의 톱니바퀴 → **Uninstall**.
+
+> `@installed` 없이 검색하면 마켓플레이스 결과가 먼저 나와 눈에 띄지 않을 수
+> 있습니다. publisher가 `local`이라 마켓플레이스에는 올라가 있지 않습니다.
+
+### 남는 것
+
+제거되는 것은 확장 본체뿐입니다.
+
+| 대상 | 자동으로 지워지나 |
+|---|---|
+| 확장 본체 (`~/.vscode/extensions/local.gpt-bridge-<버전>`) | ✅ |
+| VS Code 전역 저장소의 감사 로그와 내려받은 `cloudflared` | ❌ |
+| VS Code SecretStorage의 인증 토큰과 터널 토큰 | ❌ |
+| `settings.json`의 `gptBridge.*` 항목 | ❌ |
+
+감사 로그에는 GPT가 읽고 쓴 파일이 모두 남습니다. 그 기록이 민감하면 폴더째 지웁니다.
+
+```powershell
+# Windows
+Remove-Item -Recurse -Force "$env:APPDATA\Code\User\globalStorage\local.gpt-bridge"
+```
+```bash
+# macOS
+rm -rf ~/Library/Application\ Support/Code/User/globalStorage/local.gpt-bridge
+# Linux
+rm -rf ~/.config/Code/User/globalStorage/local.gpt-bridge
+```
+
+남은 Bearer 토큰 자체는 무해합니다. `127.0.0.1`의 GPT Bridge 서버에만 쓰이던
+값이고, 확장을 지우면 그 자리에서 응답하는 것이 없습니다.
+
+### 터널은 확장과 같이 사라지지 않습니다
+
+**ChatGPT 연결**에서 만든 것들은 확장을 지워도 그대로 남습니다. 따로 정리하세요.
+
+1. **`tunnel-client` 종료** — 연결을 붙잡고 있는 창을 닫습니다.
+2. **`gpt-bridge.yaml` 삭제** — **OpenAI API 키가 평문으로** 들어 있습니다.
+   Windows는 `%APPDATA%\tunnel-client\`, 나머지는 `~/.config/tunnel-client/`.
+3. **그 API 키 폐기** —
+   [platform.openai.com](https://platform.openai.com/settings/organization/api-keys).
+   로컬 파일을 지운다고 키가 무효화되지는 않습니다. 폐기해야 무효가 됩니다.
+4. **터널 삭제** —
+   [platform.openai.com](https://platform.openai.com/settings/organization/tunnels).
+   이어서 ChatGPT → 설정 → 앱 및 커넥터에서 커넥터도 지웁니다.
 
 ## 개발
 

@@ -49,6 +49,7 @@ npm run setup
 > `npm install` 才能正常工作。
 
 **更新时**执行 `git pull && npm install && npm run setup`。
+**卸载时**参见本文末尾的 *卸载* 一节。
 
 ### 如果提示找不到 `code` 命令
 
@@ -319,6 +320,63 @@ cd "<解压到的文件夹>"
 5. 多根工作区只处理第一个文件夹。
 6. 不提供终端执行和 Git 操作类工具。
 7. **「保存前磁盘安全」只适用于文本修改。**
+
+## 卸载
+
+扩展 ID 是 `local.gpt-bridge`。
+
+```bash
+code --uninstall-extension local.gpt-bridge
+```
+
+然后执行 `Ctrl+Shift+P` → **`Developer: Reload Window`**。
+
+也可以在界面里操作：扩展面板（`Ctrl+Shift+X`）中搜索
+**`@installed gpt bridge`** → 点击条目上的齿轮 → **Uninstall**。
+
+> 不加 `@installed` 搜索时，市场结果会排在前面，容易找不到。
+> 该扩展的 publisher 是 `local`，因此从不出现在市场中。
+
+### 会留下什么
+
+卸载只会删除扩展本体。
+
+| 对象 | 是否自动删除 |
+|---|---|
+| 扩展本体（`~/.vscode/extensions/local.gpt-bridge-<版本>`） | ✅ |
+| VS Code 全局存储中的审计日志和已下载的 `cloudflared` | ❌ |
+| VS Code SecretStorage 中的认证令牌和隧道令牌 | ❌ |
+| `settings.json` 里的 `gptBridge.*` 配置项 | ❌ |
+
+审计日志记录了 GPT 读写过的每一个文件。如果这些记录敏感，请连同文件夹一起删除：
+
+```powershell
+# Windows
+Remove-Item -Recurse -Force "$env:APPDATA\Code\User\globalStorage\local.gpt-bridge"
+```
+```bash
+# macOS
+rm -rf ~/Library/Application\ Support/Code/User/globalStorage/local.gpt-bridge
+# Linux
+rm -rf ~/.config/Code/User/globalStorage/local.gpt-bridge
+```
+
+残留的 Bearer 令牌本身无害。它只用于 `127.0.0.1` 上的 GPT Bridge 服务器，
+扩展删除后那里已无任何东西应答。
+
+### 隧道不会随扩展一起消失
+
+**连接 ChatGPT** 一节中配置的内容不会因卸载而撤销，需要单独清理：
+
+1. **停止 `tunnel-client`** — 关闭保持连接的那个窗口。
+2. **删除 `gpt-bridge.yaml`** — 其中**以明文保存着你的 OpenAI API 密钥**。
+   Windows 位于 `%APPDATA%\tunnel-client\`，其他系统位于 `~/.config/tunnel-client/`。
+3. **吊销该 API 密钥** —
+   [platform.openai.com](https://platform.openai.com/settings/organization/api-keys)。
+   删除本地文件并不会让密钥失效，只有吊销才会。
+4. **删除隧道** —
+   [platform.openai.com](https://platform.openai.com/settings/organization/tunnels)，
+   并在 ChatGPT → 设置 → 应用与连接器 中移除该连接器。
 
 ## 开发
 

@@ -50,6 +50,7 @@ npm run setup
 > 自分がいる場所は外側なので、そのフォルダに入らないと `npm install` が正しく動きません。
 
 **更新するとき**は `git pull && npm install && npm run setup`。
+**削除するとき**はこのファイル下部の *アンインストール* を参照してください。
 
 ### `code` コマンドが見つからないと表示されたら
 
@@ -332,6 +333,66 @@ ChatGPT に貼り付けます。
 5. マルチルートワークスペースは最初のフォルダのみが対象です。
 6. ターミナル実行や Git 操作のツールは提供しません。
 7. **「保存するまでディスクは安全」はテキスト編集のみに当てはまります。**
+
+## アンインストール
+
+拡張機能の ID は `local.gpt-bridge` です。
+
+```bash
+code --uninstall-extension local.gpt-bridge
+```
+
+そのあと `Ctrl+Shift+P` → **`Developer: Reload Window`**。
+
+UI から行う場合は、拡張機能パネル（`Ctrl+Shift+X`）で
+**`@installed gpt bridge`** を検索 → 項目の歯車 → **Uninstall**。
+
+> `@installed` を付けずに検索するとマーケットプレイスの結果が先に並び、
+> 見つけにくくなります。publisher が `local` なので、マーケットプレイスには
+> 掲載されていません。
+
+### 残るもの
+
+削除されるのは拡張機能の本体だけです。
+
+| 対象 | 自動で消えるか |
+|---|---|
+| 拡張機能の本体（`~/.vscode/extensions/local.gpt-bridge-<バージョン>`） | ✅ |
+| VS Code グローバルストレージ内の監査ログとダウンロード済み `cloudflared` | ❌ |
+| VS Code SecretStorage 内の認証トークンとトンネルトークン | ❌ |
+| `settings.json` の `gptBridge.*` の項目 | ❌ |
+
+監査ログには GPT が読み書きしたファイルがすべて残ります。その履歴が機微なら
+フォルダごと削除してください。
+
+```powershell
+# Windows
+Remove-Item -Recurse -Force "$env:APPDATA\Code\User\globalStorage\local.gpt-bridge"
+```
+```bash
+# macOS
+rm -rf ~/Library/Application\ Support/Code/User/globalStorage/local.gpt-bridge
+# Linux
+rm -rf ~/.config/Code/User/globalStorage/local.gpt-bridge
+```
+
+残った Bearer トークン自体は無害です。`127.0.0.1` の GPT Bridge サーバーにしか
+使われない値で、拡張機能を消せばそこで応答するものはありません。
+
+### トンネル側は拡張機能と一緒には消えません
+
+**ChatGPT との接続**で用意したものは、アンインストールしても残ります。
+別途片付けてください。
+
+1. **`tunnel-client` を停止** — 接続を保持しているウィンドウを閉じます。
+2. **`gpt-bridge.yaml` を削除** — **OpenAI API キーが平文で**入っています。
+   Windows は `%APPDATA%\tunnel-client\`、それ以外は `~/.config/tunnel-client/`。
+3. **その API キーを失効させる** —
+   [platform.openai.com](https://platform.openai.com/settings/organization/api-keys)。
+   ローカルのファイルを消してもキーは無効になりません。失効させて初めて無効です。
+4. **トンネルを削除** —
+   [platform.openai.com](https://platform.openai.com/settings/organization/tunnels)。
+   続けて ChatGPT → 設定 → アプリとコネクタ からコネクタも削除します。
 
 ## 開発
 

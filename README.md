@@ -51,6 +51,7 @@ icon appears in the left activity bar.
 > it finishes, so you have to step into that folder for `npm install` to work.
 
 **To update:** `git pull && npm install && npm run setup`.
+**To remove it:** see *Uninstall* near the end of this file.
 
 ### If it says the `code` command was not found
 
@@ -331,6 +332,65 @@ update `Authorization` in the config file too.
 5. Multi-root workspaces use the first folder only.
 6. No terminal-execution or Git-manipulation tools are provided.
 7. **"Safe until you save" applies to text edits only.**
+
+## Uninstall
+
+The extension ID is `local.gpt-bridge`.
+
+```bash
+code --uninstall-extension local.gpt-bridge
+```
+
+Then run `Ctrl+Shift+P` → **`Developer: Reload Window`**.
+
+From the UI instead: Extensions panel (`Ctrl+Shift+X`) → search
+**`@installed gpt bridge`** → gear icon on the entry → **Uninstall**.
+
+> Search without `@installed` and Marketplace results come first, so you may not
+> spot it. The publisher is `local`, so it never appears on the Marketplace.
+
+### What stays behind
+
+Uninstalling removes the extension and nothing else.
+
+| What | Removed for you? |
+|---|---|
+| The extension itself (`~/.vscode/extensions/local.gpt-bridge-<version>`) | ✅ |
+| Audit logs and the downloaded `cloudflared`, in VS Code global storage | ❌ |
+| Auth token and tunnel token, in VS Code SecretStorage | ❌ |
+| `gptBridge.*` entries in your `settings.json` | ❌ |
+
+The audit log lists every file GPT read or wrote. Delete the folder if that history
+is sensitive:
+
+```powershell
+# Windows
+Remove-Item -Recurse -Force "$env:APPDATA\Code\User\globalStorage\local.gpt-bridge"
+```
+```bash
+# macOS
+rm -rf ~/Library/Application\ Support/Code/User/globalStorage/local.gpt-bridge
+# Linux
+rm -rf ~/.config/Code/User/globalStorage/local.gpt-bridge
+```
+
+The leftover Bearer token is inert. It only ever authorized a GPT Bridge server on
+`127.0.0.1`, and once the extension is gone nothing answers there.
+
+### The tunnel outlives the extension
+
+Nothing you set up under **Connecting ChatGPT** is undone by the uninstall. Clear it
+separately:
+
+1. **Stop `tunnel-client`** — close the window holding the connection open.
+2. **Delete `gpt-bridge.yaml`** — it stores your **OpenAI API key in plain text**.
+   `%APPDATA%\tunnel-client\` on Windows, `~/.config/tunnel-client/` elsewhere.
+3. **Revoke that API key** on
+   [platform.openai.com](https://platform.openai.com/settings/organization/api-keys).
+   Deleting the local file does not invalidate the key — only revoking does.
+4. **Delete the tunnel** on
+   [platform.openai.com](https://platform.openai.com/settings/organization/tunnels),
+   then remove the connector in ChatGPT → Settings → Apps & Connectors.
 
 ## Development
 
